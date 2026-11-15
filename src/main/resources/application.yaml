@@ -26,6 +26,10 @@ app:
     secret: ${JWT_SECRET}
     access-token-expiration: 30m
     refresh-token-expiration: 14d
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_CLIENT_SECRET}
+    allowed-redirect-uris: ${KAKAO_REDIRECT_URIS}
 
 server:
   port: 8080
