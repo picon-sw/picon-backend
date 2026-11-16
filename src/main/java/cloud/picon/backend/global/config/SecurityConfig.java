@@ -25,7 +25,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/actuator/health", "/error").permitAll()
                         .requestMatchers("/api/auth/kakao").permitAll()
                         // Swagger: SWAGGER_ENABLED=true일 때만 열림. 배포 환경에서는 꺼져 있어 404
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // Authorization: Bearer {토큰}을 검증. 실패하면 공통 응답 형식의 401

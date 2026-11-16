@@ -35,9 +35,20 @@ public class AuthService {
 
         Long kakaoId = kakaoOAuthClient.getKakaoId(request.code(), request.redirectUri());
 
+        Member member;
+        boolean isNewMember = false;
         Optional<Member> foundMember = memberRepository.findByKakaoId(kakaoId);
-        boolean isNewMember = foundMember.isEmpty();
-        Member member = foundMember.orElseGet(() -> createMember(kakaoId));
+        if (foundMember.isPresent()) {
+            member = foundMember.get();
+        } else {
+            try {
+                member = memberRepository.save(Member.createKakaoMember(kakaoId));
+                isNewMember = true;
+            } catch (DataIntegrityViolationException e) {
+                // 동시에 처음 로그인해서 다른 요청이 먼저 저장한 경우, 그 회원을 사용
+                member = memberRepository.findByKakaoId(kakaoId).orElseThrow(() -> e);
+            }
+        }
 
         String accessToken = jwtProvider.createAccessToken(member.getId());
         String refreshToken = jwtProvider.createRefreshToken();
@@ -49,15 +60,6 @@ public class AuthService {
                 isNewMember,
                 member.isOnboarded());
         return new LoginResult(response, refreshToken);
-    }
-
-    private Member createMember(Long kakaoId) {
-        try {
-            return memberRepository.save(Member.createKakaoMember(kakaoId));
-        } catch (DataIntegrityViolationException e) {
-            // 동시에 처음 로그인해서 다른 요청이 먼저 저장한 경우, 그 회원을 사용
-            return memberRepository.findByKakaoId(kakaoId).orElseThrow(() -> e);
-        }
     }
 
     private void validateRedirectUri(String redirectUri) {
