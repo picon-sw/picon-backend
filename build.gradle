@@ -36,6 +36,18 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
+}
+
+// CVE-2026-110879 대응: Spring Boot 기본 버전에 취약점이 있어 패치 버전으로 지정
+// Spring Boot를 이 버전 이상이 포함된 버전으로 올리면 이 블록은 지워도 됨
+dependencyManagement {
+    dependencies {
+        dependency 'com.fasterxml.jackson.core:jackson-databind:2.21.8'
+        dependency 'tools.jackson.core:jackson-databind:3.1.8'
+    }
 }
 
 tasks.named('test') {
