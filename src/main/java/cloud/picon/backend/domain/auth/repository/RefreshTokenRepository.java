@@ -23,8 +23,9 @@ public class RefreshTokenRepository {
         redisTemplate.opsForValue().set(key(refreshToken), String.valueOf(memberId), ttl);
     }
 
-    public Optional<Long> findMemberId(String refreshToken) {
-        String memberId = redisTemplate.opsForValue().get(key(refreshToken));
+    // 조회와 삭제를 한 번에 처리(Redis GETDEL). 같은 토큰으로 동시에 재발급해도 한 요청만 성공
+    public Optional<Long> findMemberIdAndDelete(String refreshToken) {
+        String memberId = redisTemplate.opsForValue().getAndDelete(key(refreshToken));
         return Optional.ofNullable(memberId).map(Long::valueOf);
     }
 

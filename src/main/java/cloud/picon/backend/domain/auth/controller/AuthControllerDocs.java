@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import cloud.picon.backend.domain.auth.dto.TokenRefreshResponse;
+import io.swagger.v3.oas.annotations.Parameter;
 
 @Tag(name = "Auth", description = "로그인, 토큰")
 public interface AuthControllerDocs {
@@ -38,4 +40,22 @@ public interface AuthControllerDocs {
     })
     ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<LoginResponse>> kakaoLogin(
             KakaoLoginRequest request);
+
+    @Operation(
+            summary = "토큰 재발급",
+            description = """
+                    refresh_token 쿠키로 Access Token을 재발급합니다. Access Token 없이 호출합니다.
+                    재발급할 때마다 새 Refresh Token을 Set-Cookie로 전달하고, 이전 Refresh Token은 무효가 됩니다.
+                    동시에 여러 번 호출하면 첫 번째만 성공합니다.
+                    """)
+    @SecurityRequirements
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "재발급 성공"),
+            @ApiResponse(responseCode = "401", description = "Refresh Token이 없거나, 만료됐거나, 이미 사용됨. 쿠키를 삭제합니다",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+                            {"isSuccess": false, "code": "INVALID_REFRESH_TOKEN", "message": "다시 로그인해 주세요."}
+                            """)))
+    })
+    ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<TokenRefreshResponse>> refresh(
+            @Parameter(hidden = true) String refreshToken);
 }

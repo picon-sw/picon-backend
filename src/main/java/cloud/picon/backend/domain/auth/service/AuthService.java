@@ -5,6 +5,8 @@ import cloud.picon.backend.domain.auth.client.KakaoProperties;
 import cloud.picon.backend.domain.auth.dto.KakaoLoginRequest;
 import cloud.picon.backend.domain.auth.dto.LoginResponse;
 import cloud.picon.backend.domain.auth.dto.LoginResult;
+import cloud.picon.backend.domain.auth.dto.TokenRefreshResponse;
+import cloud.picon.backend.domain.auth.dto.TokenRefreshResult;
 import cloud.picon.backend.domain.auth.repository.RefreshTokenRepository;
 import cloud.picon.backend.domain.member.entity.Member;
 import cloud.picon.backend.domain.member.repository.MemberRepository;
@@ -15,6 +17,7 @@ import cloud.picon.backend.global.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.Optional;
 
@@ -50,21 +53,46 @@ public class AuthService {
             }
         }
 
-        String accessToken = jwtProvider.createAccessToken(member.getId());
-        String refreshToken = jwtProvider.createRefreshToken();
-        refreshTokenRepository.save(refreshToken, member.getId(), jwtProperties.refreshTokenExpiration());
-
+        Tokens tokens = issueTokens(member.getId());
         LoginResponse response = new LoginResponse(
-                accessToken,
+                tokens.accessToken(),
                 jwtProvider.getAccessTokenExpiresIn(),
                 isNewMember,
                 member.isOnboarded());
-        return new LoginResult(response, refreshToken);
+        return new LoginResult(response, tokens.refreshToken());
+    }
+
+    // 사용한 Refresh Token은 바로 삭제하고 새로 발급 (로테이션)
+    public TokenRefreshResult refresh(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        Long memberId = refreshTokenRepository.findMemberIdAndDelete(refreshToken)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+        if (!memberRepository.existsById(memberId)) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        Tokens tokens = issueTokens(memberId);
+        TokenRefreshResponse response = new TokenRefreshResponse(
+                tokens.accessToken(),
+                jwtProvider.getAccessTokenExpiresIn());
+        return new TokenRefreshResult(response, tokens.refreshToken());
+    }
+
+    private Tokens issueTokens(Long memberId) {
+        String accessToken = jwtProvider.createAccessToken(memberId);
+        String refreshToken = jwtProvider.createRefreshToken();
+        refreshTokenRepository.save(refreshToken, memberId, jwtProperties.refreshTokenExpiration());
+        return new Tokens(accessToken, refreshToken);
     }
 
     private void validateRedirectUri(String redirectUri) {
         if (!kakaoProperties.allowedRedirectUris().contains(redirectUri)) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
+    }
+
+    private record Tokens(String accessToken, String refreshToken) {
     }
 }
