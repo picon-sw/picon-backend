@@ -7,8 +7,6 @@ import cloud.picon.backend.domain.auth.dto.TokenRefreshResponse;
 import cloud.picon.backend.domain.auth.dto.TokenRefreshResult;
 import cloud.picon.backend.domain.auth.service.AuthService;
 import cloud.picon.backend.global.apipayload.ApiResponse;
-import cloud.picon.backend.global.apipayload.code.ErrorCode;
-import cloud.picon.backend.global.apipayload.exception.BusinessException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -41,20 +39,11 @@ public class AuthController implements AuthControllerDocs {
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<TokenRefreshResponse>> refresh(
             @CookieValue(name = RefreshTokenCookieProvider.COOKIE_NAME, required = false) String refreshToken) {
-        try {
-            TokenRefreshResult result = authService.refresh(refreshToken);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookieProvider.create(result.refreshToken()).toString())
-                    .body(ApiResponse.onSuccess(result.response()));
-        } catch (BusinessException e) {
-            if (e.getErrorCode() != ErrorCode.INVALID_REFRESH_TOKEN) {
-                throw e;
-            }
-            // 쓸 수 없는 쿠키가 브라우저에 남지 않도록 삭제하고 401 응답
-            return ResponseEntity.status(e.getErrorCode().getStatus())
-                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookieProvider.expire().toString())
-                    .body(ApiResponse.onFailure(e.getErrorCode(), e.getErrorCode().getMessage(), null));
-        }
+        // 실패 시 쿠키를 지우지 않음: 동시 재발급에서 늦게 도착한 실패 응답이 새 쿠키를 지우는 것을 막기 위함
+        TokenRefreshResult result = authService.refresh(refreshToken);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookieProvider.create(result.refreshToken()).toString())
+                .body(ApiResponse.onSuccess(result.response()));
     }
 
     @Override

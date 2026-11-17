@@ -2,7 +2,9 @@ package cloud.picon.backend.domain.auth.controller;
 
 import cloud.picon.backend.domain.auth.dto.KakaoLoginRequest;
 import cloud.picon.backend.domain.auth.dto.LoginResponse;
+import cloud.picon.backend.domain.auth.dto.TokenRefreshResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -10,8 +12,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
-import cloud.picon.backend.domain.auth.dto.TokenRefreshResponse;
-import io.swagger.v3.oas.annotations.Parameter;
 
 @Tag(name = "Auth", description = "로그인, 토큰")
 public interface AuthControllerDocs {
@@ -51,7 +51,7 @@ public interface AuthControllerDocs {
     @SecurityRequirements
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "재발급 성공"),
-            @ApiResponse(responseCode = "401", description = "Refresh Token이 없거나, 만료됐거나, 이미 사용됨. 쿠키를 삭제합니다",
+            @ApiResponse(responseCode = "401", description = "Refresh Token이 없거나, 만료됐거나, 이미 사용됨",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
                             {"isSuccess": false, "code": "INVALID_REFRESH_TOKEN", "message": "다시 로그인해 주세요."}
                             """)))
@@ -62,7 +62,7 @@ public interface AuthControllerDocs {
     @Operation(
             summary = "로그아웃",
             description = """
-                    refresh_token 쿠키의 Refresh Token을 무효화하고 쿠키를 삭제합니다. Access Token 없이 호출합니다.
+                    이 로그인 세션을 무효화하고 쿠키를 삭제합니다. 이 세션에서 발급된 Refresh Token은 모두 재발급에 쓸 수 없습니다. Access Token 없이 호출합니다.
                     쿠키가 없거나 이미 로그아웃한 상태여도 200을 반환합니다.
                     Access Token은 만료 시간까지 유효하므로 프론트에서 삭제해 주세요.
                     """)
