@@ -55,11 +55,6 @@ class ExpertSearchIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS expert (member_id BIGINT PRIMARY KEY, career_years SMALLINT NOT NULL,
-                avg_rating DECIMAL(2,1) NOT NULL, review_count INT NOT NULL, created_at TIMESTAMP NOT NULL,
-                updated_at TIMESTAMP NOT NULL)
-                """);
         jdbc.execute("CREATE TABLE IF NOT EXISTS expert_specialty (expert_specialty_id BIGINT PRIMARY KEY, member_id BIGINT, name VARCHAR(20), base_price INT)");
         jdbc.execute("CREATE TABLE IF NOT EXISTS photo_style (photo_style_id BIGINT PRIMARY KEY, name VARCHAR(20))");
         jdbc.execute("CREATE TABLE IF NOT EXISTS expert_photo_style (expert_photo_style_id BIGINT PRIMARY KEY, member_id BIGINT, photo_style_id BIGINT)");
@@ -78,7 +73,7 @@ class ExpertSearchIntegrationTest {
         member(7, "not-expert", "hidden");
         member(99, "viewer", null);
         for (int id = 1; id <= 6; id++) {
-            jdbc.update("INSERT INTO expert VALUES (?, ?, ?, ?, ?, ?)", id, id == 1 ? 3 : 5,
+            jdbc.update("INSERT INTO expert(member_id, career_years, avg_rating, review_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", id, id == 1 ? 3 : 5,
                     id <= 3 ? "4.9" : "3.5", id == 1 ? 20 : 30,
                     id == 1 ? "2026-01-01 00:00:00" : "2026-01-02 00:00:00", "2026-01-02 00:00:00");
         }
