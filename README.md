@@ -33,3 +33,30 @@
 - **예시**
     - feat: 의뢰 등록 API 추가
     - fix: 의뢰 목록 조회 시 페이지 번호 오류 수정
+
+
+### Local fake image URLs
+
+The `local` profile supports placeholder image URLs for development. Both settings are required:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "local"
+$env:S3_FAKE_IMAGE_URL = "true"
+./gradlew.bat bootRun
+```
+
+Only the single active profile `local` is allowed in fake mode. No active profile,
+other profiles, or `local` combined with another profile cause startup to fail.
+When the flag is absent or false, the real S3 provider is selected, including in `local`.
+Real S3 errors never fall back to fake URLs.
+
+Fake mode does not create an S3 presigner and needs no AWS credentials, bucket, or region.
+URLs under `https://local.invalid/` are placeholders and cannot download images.
+The existing DB, JWT, and Kakao configuration is still required:
+`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `KAKAO_CLIENT_ID`,
+`KAKAO_CLIENT_SECRET`, and `KAKAO_REDIRECT_URIS`.
+Redis defaults remain unchanged. Use local resources and never production credentials.
+
+Deployment configuration must keep `S3_FAKE_IMAGE_URL=false` and must not activate
+`local`: an application cannot independently detect a production deployment that
+incorrectly identifies itself as local.

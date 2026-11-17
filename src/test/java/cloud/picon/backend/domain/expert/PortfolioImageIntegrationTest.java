@@ -44,8 +44,6 @@ class PortfolioImageIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // expert는 아직 JPA 관리 대상이 아니므로 실제 쿼리에 필요한 최소 테이블만 준비한다.
-        jdbc.execute("CREATE TABLE IF NOT EXISTS expert (member_id BIGINT PRIMARY KEY)");
         cleanUp();
         for (int id = 1; id <= 5; id++) {
             String nickname = switch (id) {
@@ -56,7 +54,7 @@ class PortfolioImageIntegrationTest {
             jdbc.update("INSERT INTO member(member_id, nickname, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                     id, nickname);
             if (id != 2) {
-                jdbc.update("INSERT INTO expert(member_id) VALUES (?)", id);
+                jdbc.update("INSERT INTO expert(member_id, created_at, updated_at) VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", id);
             }
         }
         insertImage(101, 1, "SHOOTING", "2026-01-01 10:00:00");

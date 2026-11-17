@@ -1,6 +1,10 @@
 package cloud.picon.backend.global.s3;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import cloud.picon.backend.global.apipayload.handler.GlobalExceptionHandler;
 import org.springframework.beans.factory.ObjectProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -25,7 +29,7 @@ class S3ImageUrlProviderTest {
                 .build()) {
             ObjectProvider<S3Presigner> bean = mock(ObjectProvider.class);
             when(bean.getObject()).thenReturn(presigner);
-            var provider = new S3ImageUrlProvider(bean,
+            var provider = new PresignedS3ImageUrlProvider(bean,
                     new S3Properties("test-bucket", "ap-northeast-2", Duration.ofMinutes(10)));
 
             String url = provider.getImageUrl("portfolio/사진 a+b.jpg");
@@ -41,9 +45,41 @@ class S3ImageUrlProviderTest {
     @SuppressWarnings("unchecked")
     void missingBucketFailsBeforeCredentialsAreResolved() {
         ObjectProvider<S3Presigner> bean = mock(ObjectProvider.class);
-        var provider = new S3ImageUrlProvider(bean,
+        var provider = new PresignedS3ImageUrlProvider(bean,
                 new S3Properties("", "", Duration.ofMinutes(10)));
         assertThatIllegalStateException().isThrownBy(() -> provider.getImageUrl("image.jpg"));
         verifyNoInteractions(bean);
+    }
+    @Test
+    @SuppressWarnings("unchecked")
+    void sdkFailureDoesNotExposeSensitiveMessageOrCause() {
+        ObjectProvider<S3Presigner> bean = mock(ObjectProvider.class);
+        when(bean.getObject()).thenThrow(new IllegalStateException(
+                "secret-key https://bucket.example/private-object"));
+        var provider = new PresignedS3ImageUrlProvider(bean,
+                new S3Properties("test-bucket", "ap-northeast-2", Duration.ofMinutes(10)));
+
+        assertThatThrownBy(() -> provider.getImageUrl("private-object"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Unable to generate image URL")
+                .hasNoCause();
+    }
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    @SuppressWarnings("unchecked")
+    void globalErrorLoggingDoesNotReceiveSdkSecrets(CapturedOutput output) {
+        ObjectProvider<S3Presigner> bean = mock(ObjectProvider.class);
+        when(bean.getObject()).thenThrow(new IllegalStateException(
+                "sensitive-object-key https://private.example/object aws-secret-value"));
+        var provider = new PresignedS3ImageUrlProvider(bean,
+                new S3Properties("test-bucket", "ap-northeast-2", Duration.ofMinutes(10)));
+        try {
+            provider.getImageUrl("sensitive-object-key");
+            fail("Expected signing failure");
+        } catch (IllegalStateException exception) {
+            assertThat(new GlobalExceptionHandler().handleUnexpected(exception).getStatusCode().value())
+                    .isEqualTo(500);
+        }
+        assertThat(output.getAll()).doesNotContain("sensitive-object-key", "private.example", "aws-secret-value");
     }
 }

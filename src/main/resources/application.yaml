@@ -21,6 +21,7 @@ spring:
 
 app:
   s3:
+    fake-image-url: ${S3_FAKE_IMAGE_URL:false}
     bucket: ${S3_BUCKET:}
     region: ${AWS_REGION:}
     presigned-url-expiration: 10m
