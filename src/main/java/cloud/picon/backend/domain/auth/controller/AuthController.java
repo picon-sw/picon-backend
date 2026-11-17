@@ -56,4 +56,14 @@ public class AuthController implements AuthControllerDocs {
                     .body(ApiResponse.onFailure(e.getErrorCode(), e.getErrorCode().getMessage(), null));
         }
     }
+
+    @Override
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @CookieValue(name = RefreshTokenCookieProvider.COOKIE_NAME, required = false) String refreshToken) {
+        authService.logout(refreshToken);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookieProvider.expire().toString())
+                .body(ApiResponse.onSuccess(null));
+    }
 }

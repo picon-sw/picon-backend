@@ -58,4 +58,18 @@ public interface AuthControllerDocs {
     })
     ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<TokenRefreshResponse>> refresh(
             @Parameter(hidden = true) String refreshToken);
+
+    @Operation(
+            summary = "로그아웃",
+            description = """
+                    refresh_token 쿠키의 Refresh Token을 무효화하고 쿠키를 삭제합니다. Access Token 없이 호출합니다.
+                    쿠키가 없거나 이미 로그아웃한 상태여도 200을 반환합니다.
+                    Access Token은 만료 시간까지 유효하므로 프론트에서 삭제해 주세요.
+                    """)
+    @SecurityRequirements
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그아웃 성공")
+    })
+    ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<Void>> logout(
+            @Parameter(hidden = true) String refreshToken);
 }

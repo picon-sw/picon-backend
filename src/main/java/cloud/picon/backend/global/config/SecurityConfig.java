@@ -23,7 +23,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // /error: 처리 못 한 오류가 내부적으로 넘어가는 경로. 막으면 원래 오류 대신 401이 나감
                         .requestMatchers("/api/actuator/health", "/error").permitAll()
-                        .requestMatchers("/api/auth/kakao", "/api/auth/refresh").permitAll()
+                        .requestMatchers("/api/auth/kakao", "/api/auth/refresh", "/api/auth/logout").permitAll()
                         // Swagger: SWAGGER_ENABLED=true일 때만 열림. 배포 환경에서는 꺼져 있어 404
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()

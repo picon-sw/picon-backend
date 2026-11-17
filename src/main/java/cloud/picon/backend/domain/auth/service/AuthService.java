@@ -80,6 +80,13 @@ public class AuthService {
         return new TokenRefreshResult(response, tokens.refreshToken());
     }
 
+    // 쿠키가 없거나 이미 삭제된 토큰이어도 그대로 성공 처리
+    public void logout(String refreshToken) {
+        if (StringUtils.hasText(refreshToken)) {
+            refreshTokenRepository.delete(refreshToken);
+        }
+    }
+
     private Tokens issueTokens(Long memberId) {
         String accessToken = jwtProvider.createAccessToken(memberId);
         String refreshToken = jwtProvider.createRefreshToken();
