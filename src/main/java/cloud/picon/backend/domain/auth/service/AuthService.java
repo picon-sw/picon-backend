@@ -53,7 +53,8 @@ public class AuthService {
             }
         }
 
-        Tokens tokens = issueTokens(member.getId());
+        // 로그인할 때마다 새 세션 시작
+        Tokens tokens = issueTokens(member.getId(), jwtProvider.createSessionId());
         LoginResponse response = new LoginResponse(
                 tokens.accessToken(),
                 jwtProvider.getAccessTokenExpiresIn(),
@@ -62,36 +63,56 @@ public class AuthService {
         return new LoginResult(response, tokens.refreshToken());
     }
 
-    // 사용한 Refresh Token은 바로 삭제하고 새로 발급 (로테이션)
+    // 사용한 Refresh Token은 바로 삭제하고 같은 세션으로 새로 발급 (로테이션)
     public TokenRefreshResult refresh(String refreshToken) {
-        if (!StringUtils.hasText(refreshToken)) {
-            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        String sessionId = extractSessionId(refreshToken).orElseThrow(this::invalidRefreshToken);
+        if (refreshTokenRepository.isSessionRevoked(sessionId)) {
+            throw invalidRefreshToken();
         }
         Long memberId = refreshTokenRepository.findMemberIdAndDelete(refreshToken)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+                .orElseThrow(this::invalidRefreshToken);
         if (!memberRepository.existsById(memberId)) {
-            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+            throw invalidRefreshToken();
         }
 
-        Tokens tokens = issueTokens(memberId);
+        Tokens tokens = issueTokens(memberId, sessionId);
+        // 재발급하는 사이 로그아웃된 경우: 방금 저장한 토큰을 지우고 실패 처리
+        if (refreshTokenRepository.isSessionRevoked(sessionId)) {
+            refreshTokenRepository.delete(tokens.refreshToken());
+            throw invalidRefreshToken();
+        }
+
         TokenRefreshResponse response = new TokenRefreshResponse(
                 tokens.accessToken(),
                 jwtProvider.getAccessTokenExpiresIn());
         return new TokenRefreshResult(response, tokens.refreshToken());
     }
 
-    // 쿠키가 없거나 이미 삭제된 토큰이어도 그대로 성공 처리
+    // 세션 전체를 무효로 표시한 뒤 토큰 삭제. 쿠키가 없거나 이미 무효인 토큰이어도 성공 처리
     public void logout(String refreshToken) {
+        extractSessionId(refreshToken).ifPresent(sessionId ->
+                refreshTokenRepository.revokeSession(sessionId, jwtProperties.refreshTokenExpiration()));
         if (StringUtils.hasText(refreshToken)) {
             refreshTokenRepository.delete(refreshToken);
         }
     }
 
-    private Tokens issueTokens(Long memberId) {
+    private Tokens issueTokens(Long memberId, String sessionId) {
         String accessToken = jwtProvider.createAccessToken(memberId);
-        String refreshToken = jwtProvider.createRefreshToken();
+        String refreshToken = jwtProvider.createRefreshToken(sessionId);
         refreshTokenRepository.save(refreshToken, memberId, jwtProperties.refreshTokenExpiration());
         return new Tokens(accessToken, refreshToken);
+    }
+
+    private Optional<String> extractSessionId(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            return Optional.empty();
+        }
+        return jwtProvider.extractSessionId(refreshToken);
+    }
+
+    private BusinessException invalidRefreshToken() {
+        return new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
     }
 
     private void validateRedirectUri(String redirectUri) {

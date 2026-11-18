@@ -16,6 +16,7 @@ import java.util.Optional;
 public class RefreshTokenRepository {
 
     private static final String KEY_PREFIX = "refresh_token:";
+    private static final String REVOKED_SESSION_PREFIX = "revoked_session:";
 
     private final StringRedisTemplate redisTemplate;
 
@@ -31,6 +32,15 @@ public class RefreshTokenRepository {
 
     public void delete(String refreshToken) {
         redisTemplate.delete(key(refreshToken));
+    }
+
+    // 로그아웃한 세션을 무효로 기록. 그 세션의 토큰은 최대 ttl 안에 만료되므로 그동안만 유지
+    public void revokeSession(String sessionId, Duration ttl) {
+        redisTemplate.opsForValue().set(REVOKED_SESSION_PREFIX + sessionId, "1", ttl);
+    }
+
+    public boolean isSessionRevoked(String sessionId) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(REVOKED_SESSION_PREFIX + sessionId));
     }
 
     private String key(String refreshToken) {
