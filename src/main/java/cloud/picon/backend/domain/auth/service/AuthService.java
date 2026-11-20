@@ -19,6 +19,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.util.Optional;
 
 @Service
@@ -53,8 +54,11 @@ public class AuthService {
             }
         }
 
-        // 로그인할 때마다 새 세션 시작
-        Tokens tokens = issueTokens(member.getId(), jwtProvider.createSessionId());
+        // 로그인할 때마다 새 세션 시작. 세션은 연장하지 않아 최대 유지 기간이 됨
+        String sessionId = jwtProvider.createSessionId();
+        refreshTokenRepository.saveSession(sessionId, member.getId(), jwtProperties.sessionExpiration());
+
+        Tokens tokens = issueTokens(member.getId(), sessionId, jwtProperties.refreshTokenExpiration());
         LoginResponse response = new LoginResponse(
                 tokens.accessToken(),
                 jwtProvider.getAccessTokenExpiresIn(),
@@ -66,18 +70,20 @@ public class AuthService {
     // 사용한 Refresh Token은 바로 삭제하고 같은 세션으로 새로 발급 (로테이션)
     public TokenRefreshResult refresh(String refreshToken) {
         String sessionId = extractSessionId(refreshToken).orElseThrow(this::invalidRefreshToken);
-        if (refreshTokenRepository.isSessionRevoked(sessionId)) {
-            throw invalidRefreshToken();
-        }
         Long memberId = refreshTokenRepository.findMemberIdAndDelete(refreshToken)
+                .orElseThrow(this::invalidRefreshToken);
+        Duration sessionRemaining = refreshTokenRepository.findSessionRemaining(sessionId, memberId)
                 .orElseThrow(this::invalidRefreshToken);
         if (!memberRepository.existsById(memberId)) {
             throw invalidRefreshToken();
         }
 
-        Tokens tokens = issueTokens(memberId, sessionId);
+        // 새 토큰은 세션에 남은 시간보다 길게 주지 않음 (최대 유지 기간 보장)
+        Duration refreshTtl = shorter(jwtProperties.refreshTokenExpiration(), sessionRemaining);
+        Tokens tokens = issueTokens(memberId, sessionId, refreshTtl);
+
         // 재발급하는 사이 로그아웃된 경우: 방금 저장한 토큰을 지우고 실패 처리
-        if (refreshTokenRepository.isSessionRevoked(sessionId)) {
+        if (!refreshTokenRepository.existsSession(sessionId)) {
             refreshTokenRepository.delete(tokens.refreshToken());
             throw invalidRefreshToken();
         }
@@ -88,19 +94,18 @@ public class AuthService {
         return new TokenRefreshResult(response, tokens.refreshToken());
     }
 
-    // 세션 전체를 무효로 표시한 뒤 토큰 삭제. 쿠키가 없거나 이미 무효인 토큰이어도 성공 처리
+    // 세션을 삭제한 뒤 토큰 삭제. 쿠키가 없거나 이미 끝난 세션이어도 성공 처리
     public void logout(String refreshToken) {
-        extractSessionId(refreshToken).ifPresent(sessionId ->
-                refreshTokenRepository.revokeSession(sessionId, jwtProperties.refreshTokenExpiration()));
+        extractSessionId(refreshToken).ifPresent(refreshTokenRepository::deleteSession);
         if (StringUtils.hasText(refreshToken)) {
             refreshTokenRepository.delete(refreshToken);
         }
     }
 
-    private Tokens issueTokens(Long memberId, String sessionId) {
+    private Tokens issueTokens(Long memberId, String sessionId, Duration refreshTtl) {
         String accessToken = jwtProvider.createAccessToken(memberId);
         String refreshToken = jwtProvider.createRefreshToken(sessionId);
-        refreshTokenRepository.save(refreshToken, memberId, jwtProperties.refreshTokenExpiration());
+        refreshTokenRepository.save(refreshToken, memberId, refreshTtl);
         return new Tokens(accessToken, refreshToken);
     }
 
@@ -109,6 +114,10 @@ public class AuthService {
             return Optional.empty();
         }
         return jwtProvider.extractSessionId(refreshToken);
+    }
+
+    private Duration shorter(Duration a, Duration b) {
+        return a.compareTo(b) <= 0 ? a : b;
     }
 
     private BusinessException invalidRefreshToken() {
