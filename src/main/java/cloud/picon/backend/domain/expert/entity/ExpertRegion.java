@@ -1,5 +1,6 @@
 package cloud.picon.backend.domain.expert.entity;
 
+import cloud.picon.backend.domain.region.entity.Region;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -7,7 +8,8 @@ import lombok.NoArgsConstructor;
 import cloud.picon.backend.global.entity.BaseCreatedEntity;
 
 @Entity
-@Table(name = "expert_region")
+@Table(name = "expert_region", uniqueConstraints = @UniqueConstraint(
+        name = "uk_expert_region_member_region_code", columnNames = {"member_id", "region_code"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ExpertRegion extends BaseCreatedEntity {

@@ -1,10 +1,11 @@
-package cloud.picon.backend.domain.member.entity;
+package cloud.picon.backend.domain.favorite.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import cloud.picon.backend.domain.expert.entity.Expert;
+import cloud.picon.backend.domain.member.entity.Member;
 import cloud.picon.backend.global.entity.BaseCreatedEntity;
 
 @Entity

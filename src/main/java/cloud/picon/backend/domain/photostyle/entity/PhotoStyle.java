@@ -1,4 +1,4 @@
-package cloud.picon.backend.domain.expert.entity;
+package cloud.picon.backend.domain.photostyle.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;

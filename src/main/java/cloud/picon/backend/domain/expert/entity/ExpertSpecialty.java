@@ -9,7 +9,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "expert_specialty")
+@Table(name = "expert_specialty", uniqueConstraints = @UniqueConstraint(
+        name = "uk_expert_specialty_member_name", columnNames = {"member_id", "name"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ExpertSpecialty extends BaseTimeEntity {

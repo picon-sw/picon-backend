@@ -1,5 +1,6 @@
 package cloud.picon.backend.domain.expert.entity;
 
+import cloud.picon.backend.domain.photostyle.entity.PhotoStyle;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -7,7 +8,8 @@ import lombok.NoArgsConstructor;
 import cloud.picon.backend.global.entity.BaseCreatedEntity;
 
 @Entity
-@Table(name = "expert_photo_style")
+@Table(name = "expert_photo_style", uniqueConstraints = @UniqueConstraint(
+        name = "uk_expert_photo_style_member_photo_style_id", columnNames = {"member_id", "photo_style_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ExpertPhotoStyle extends BaseCreatedEntity {

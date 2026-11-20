@@ -4,16 +4,17 @@ import cloud.picon.backend.domain.expert.entity.Expert;
 import cloud.picon.backend.domain.expert.entity.ExpertPhotoStyle;
 import cloud.picon.backend.domain.expert.entity.ExpertRegion;
 import cloud.picon.backend.domain.expert.entity.ExpertSpecialty;
-import cloud.picon.backend.domain.expert.entity.PhotoStyle;
-import cloud.picon.backend.domain.expert.entity.Region;
 import cloud.picon.backend.domain.expert.entity.Specialty;
-import cloud.picon.backend.domain.member.entity.Favorite;
+import cloud.picon.backend.domain.favorite.entity.Favorite;
 import cloud.picon.backend.domain.member.entity.Member;
+import cloud.picon.backend.domain.photostyle.entity.PhotoStyle;
+import cloud.picon.backend.domain.region.entity.Region;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -158,19 +159,77 @@ class ExpertReferenceEntityIntegrationTest {
     }
 
     @Test
-    void rejectsDuplicateFavoritePairInDatabase() throws Exception {
-        Expert expert = persistExpert();
-        Member viewer = persistMember(987657L);
-        entityManager.persist(new Favorite(viewer, expert));
+    void specialtyIsUniquePerExpertAndName() throws Exception {
+        Expert firstExpert = persistExpert();
+        Expert secondExpert = persistExpert(987658L);
+        entityManager.persist(new ExpertSpecialty(firstExpert, Specialty.SHOOTING, 80000));
+        entityManager.persist(new ExpertSpecialty(firstExpert, Specialty.EDITING, 30000));
+        entityManager.persist(new ExpertSpecialty(secondExpert, Specialty.SHOOTING, 90000));
         entityManager.flush();
-        entityManager.persist(new Favorite(expert.getMember(), expert));
+
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO expert_specialty (member_id, name, base_price, created_at, updated_at)
+                VALUES (?, 'SHOOTING', 100000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, firstExpert.getId()))
+                .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    @Test
+    void regionIsUniquePerExpertAndRegionCode() throws Exception {
+        Expert firstExpert = persistExpert();
+        Expert secondExpert = persistExpert(987658L);
+        Region firstRegion = new Region(1165000000L, "Seoul", "Seocho", null);
+        Region secondRegion = new Region(1168000000L, "Seoul", "Gangnam", null);
+        entityManager.persist(firstRegion);
+        entityManager.persist(secondRegion);
+        entityManager.persist(new ExpertRegion(firstExpert, firstRegion));
+        entityManager.persist(new ExpertRegion(firstExpert, secondRegion));
+        entityManager.persist(new ExpertRegion(secondExpert, firstRegion));
+        entityManager.flush();
+
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO expert_region (member_id, region_code, created_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                """, firstExpert.getId(), firstRegion.getRegionCode()))
+                .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    @Test
+    void photoStyleIsUniquePerExpertAndPhotoStyleId() throws Exception {
+        Expert firstExpert = persistExpert();
+        Expert secondExpert = persistExpert(987658L);
+        PhotoStyle firstStyle = new PhotoStyle("First style");
+        PhotoStyle secondStyle = new PhotoStyle("Second style");
+        entityManager.persist(firstStyle);
+        entityManager.persist(secondStyle);
+        entityManager.persist(new ExpertPhotoStyle(firstExpert, firstStyle));
+        entityManager.persist(new ExpertPhotoStyle(firstExpert, secondStyle));
+        entityManager.persist(new ExpertPhotoStyle(secondExpert, firstStyle));
+        entityManager.flush();
+
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO expert_photo_style (member_id, photo_style_id, created_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                """, firstExpert.getId(), firstStyle.getId()))
+                .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    @Test
+    void favoriteIsUniquePerMemberAndExpert() throws Exception {
+        Expert firstExpert = persistExpert();
+        Expert secondExpert = persistExpert(987658L);
+        Member firstViewer = persistMember(987657L);
+        Member secondViewer = persistMember(987659L);
+        entityManager.persist(new Favorite(firstViewer, firstExpert));
+        entityManager.persist(new Favorite(firstViewer, secondExpert));
+        entityManager.persist(new Favorite(secondViewer, firstExpert));
         entityManager.flush();
 
         assertThatThrownBy(() -> jdbc.update("""
                 INSERT INTO favorite (member_id, expert_member_id, created_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
-                """, viewer.getId(), expert.getId()))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                """, firstViewer.getId(), firstExpert.getId()))
+                .isInstanceOf(DuplicateKeyException.class);
     }
 
     @Test
@@ -231,10 +290,14 @@ class ExpertReferenceEntityIntegrationTest {
     }
 
     private Expert persistExpert() throws Exception {
+        return persistExpert(987656L);
+    }
+
+    private Expert persistExpert(long kakaoId) throws Exception {
         var constructor = Expert.class.getDeclaredConstructor();
         constructor.setAccessible(true);
         Expert expert = constructor.newInstance();
-        ReflectionTestUtils.setField(expert, "member", persistMember(987656L));
+        ReflectionTestUtils.setField(expert, "member", persistMember(kakaoId));
         entityManager.persist(expert);
         return expert;
     }
