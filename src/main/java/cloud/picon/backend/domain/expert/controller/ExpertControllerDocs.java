@@ -1,14 +1,16 @@
 package cloud.picon.backend.domain.expert.controller;
 
-import cloud.picon.backend.domain.expert.dto.ExpertPageResponse;
+import cloud.picon.backend.domain.expert.dto.ExpertResponse;
 import cloud.picon.backend.domain.expert.entity.Specialty;
+import cloud.picon.backend.global.apipayload.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.jwt.Jwt;
 
 @Tag(name = "Experts", description = "전문가 검색")
 public interface ExpertControllerDocs {
@@ -29,12 +31,21 @@ public interface ExpertControllerDocs {
             """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "OK: 전문가 페이지 조회 성공"),
-            @ApiResponse(responseCode = "400", description = "INVALID_REQUEST: 잘못된 검색·가격·경력·정렬·페이지 값"),
-            @ApiResponse(responseCode = "401", description = "UNAUTHORIZED: 토큰 누락·만료·위조 또는 잘못된 회원 ID"),
-            @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR: 데이터 무결성·이미지 설정 또는 서버 오류")
+            @ApiResponse(responseCode = "400", description = "INVALID_REQUEST: 잘못된 검색·가격·경력·정렬·페이지 값",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "INVALID_REQUEST", value = """
+                            {"isSuccess": false, "code": "INVALID_REQUEST", "message": "요청 값이 올바르지 않습니다."}
+                            """))),
+            @ApiResponse(responseCode = "401", description = "UNAUTHORIZED: 토큰 누락·만료·위조 또는 잘못된 회원 ID",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "UNAUTHORIZED", value = """
+                            {"isSuccess": false, "code": "UNAUTHORIZED", "message": "로그인이 필요합니다."}
+                            """))),
+            @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR: 데이터 무결성·이미지 설정 또는 서버 오류",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "INTERNAL_ERROR", value = """
+                            {"isSuccess": false, "code": "INTERNAL_ERROR", "message": "서버 오류가 발생했습니다."}
+                            """)))
     })
-    ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<ExpertPageResponse>> search(
-            @Parameter(hidden = true) Jwt jwt,
+    ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<PageResponse<ExpertResponse>>> search(
             String keyword, Specialty specialty, Long photoStyleId, Long regionCode,
-            Integer minPrice, Integer maxPrice, Integer minCareerYears, String sort, int page, int size);
+            Integer minPrice, Integer maxPrice, Integer minCareerYears, String sort, int page, int size,
+            @Parameter(hidden = true) Long memberId);
 }

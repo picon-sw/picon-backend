@@ -5,6 +5,8 @@ import cloud.picon.backend.domain.expert.entity.Specialty;
 import cloud.picon.backend.domain.expert.service.ExpertQueryService;
 import cloud.picon.backend.domain.expert.service.ExpertService;
 import cloud.picon.backend.domain.expert.repository.ExpertSearchRepository;
+import cloud.picon.backend.global.apipayload.PageResponse;
+import cloud.picon.backend.global.apipayload.code.ErrorCode;
 import cloud.picon.backend.global.jwt.JwtProvider;
 import cloud.picon.backend.global.s3.S3ImageUrlProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +17,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -36,7 +39,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
 
-@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:expert-search-test;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=MEMBER")
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:expert-search-test;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=MEMBER",
+        "springdoc.api-docs.enabled=true"
+})
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 class ExpertSearchIntegrationTest {
@@ -55,12 +61,6 @@ class ExpertSearchIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbc.execute("CREATE TABLE IF NOT EXISTS expert_specialty (expert_specialty_id BIGINT PRIMARY KEY, member_id BIGINT, name VARCHAR(20), base_price INT)");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS photo_style (photo_style_id BIGINT PRIMARY KEY, name VARCHAR(20))");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS expert_photo_style (expert_photo_style_id BIGINT PRIMARY KEY, member_id BIGINT, photo_style_id BIGINT)");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS region (region_code BIGINT PRIMARY KEY, first_depth VARCHAR(20), second_depth VARCHAR(20), third_depth VARCHAR(20))");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS expert_region (expert_region_id BIGINT PRIMARY KEY, member_id BIGINT, region_code BIGINT)");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS favorite (favorite_id BIGINT PRIMARY KEY, member_id BIGINT, expert_member_id BIGINT)");
         for (String table : new String[]{"favorite", "expert_image", "expert_region", "expert_photo_style", "expert_specialty", "expert", "photo_style", "region", "member"}) {
             jdbc.update("DELETE FROM " + table);
         }
@@ -71,18 +71,42 @@ class ExpertSearchIntegrationTest {
         member(5, null, "hidden");
         member(6, "   ", "hidden");
         member(7, "not-expert", "hidden");
+        member(98, "other viewer", null);
         member(99, "viewer", null);
         for (int id = 1; id <= 6; id++) {
             jdbc.update("INSERT INTO expert(member_id, career_years, avg_rating, review_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", id, id == 1 ? 3 : 5,
                     id <= 3 ? "4.9" : "3.5", id == 1 ? 20 : 30,
                     id == 1 ? "2026-01-01 00:00:00" : "2026-01-02 00:00:00", "2026-01-02 00:00:00");
         }
-        jdbc.update("INSERT INTO expert_specialty VALUES (1,1,'SHOOTING',80000),(2,1,'EDITING',30000),(3,2,'SHOOTING',50000),(4,2,'EDITING',90000),(5,3,'SHOOTING',100000),(6,3,'EDITING',20000),(7,4,'SHOOTING',0)");
-        jdbc.update("INSERT INTO photo_style VALUES (10,'졸업사진'),(11,'차분한')");
-        jdbc.update("INSERT INTO expert_photo_style VALUES (1,1,10),(2,2,10),(3,3,11),(4,1,10)");
-        jdbc.update("INSERT INTO region VALUES (1111000000,'서울특별시','종로구',NULL),(1165000000,'서울특별시','서초구',NULL)");
-        jdbc.update("INSERT INTO expert_region VALUES (1,1,1111000000),(2,1,1165000000),(3,2,1111000000),(4,3,1165000000),(5,1,1111000000)");
-        jdbc.update("INSERT INTO favorite VALUES (1,99,1),(2,99,1),(3,98,2)");
+        jdbc.update("""
+                INSERT INTO expert_specialty (expert_specialty_id, member_id, name, base_price, created_at, updated_at)
+                VALUES (1, 1, 'SHOOTING', 80000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                       (2, 1, 'EDITING', 30000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                       (3, 2, 'SHOOTING', 50000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                       (4, 2, 'EDITING', 90000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                       (5, 3, 'SHOOTING', 100000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                       (6, 3, 'EDITING', 20000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                       (7, 4, 'SHOOTING', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
+        jdbc.update("INSERT INTO photo_style (photo_style_id, name) VALUES (10,'졸업사진'),(11,'차분한')");
+        jdbc.update("""
+                INSERT INTO expert_photo_style (expert_photo_style_id, member_id, photo_style_id, created_at)
+                VALUES (1, 1, 10, CURRENT_TIMESTAMP), (2, 2, 10, CURRENT_TIMESTAMP), (3, 3, 11, CURRENT_TIMESTAMP)
+                """);
+        jdbc.update("""
+                INSERT INTO region (region_code, first_depth, second_depth, third_depth)
+                VALUES (1111000000, '서울특별시', '종로구', NULL),
+                       (1165000000, '서울특별시', '서초구', NULL)
+                """);
+        jdbc.update("""
+                INSERT INTO expert_region (expert_region_id, member_id, region_code, created_at)
+                VALUES (1, 1, 1111000000, CURRENT_TIMESTAMP), (2, 1, 1165000000, CURRENT_TIMESTAMP),
+                       (3, 2, 1111000000, CURRENT_TIMESTAMP), (4, 3, 1165000000, CURRENT_TIMESTAMP)
+                """);
+        jdbc.update("""
+                INSERT INTO favorite (favorite_id, member_id, expert_member_id, created_at)
+                VALUES (1, 99, 1, CURRENT_TIMESTAMP), (3, 98, 2, CURRENT_TIMESTAMP)
+                """);
         image(101, 1, "SHOOTING", "2026-01-01 00:00:00");
         image(102, 1, "SHOOTING", "2026-01-01 00:00:00");
         image(103, 1, "EDITING", "2026-01-03 00:00:00");
@@ -196,9 +220,6 @@ class ExpertSearchIntegrationTest {
         var result = queryService.search(condition("졸업", Specialty.SHOOTING, 10L, 1111000000L, 40000, 90000, 4, ExpertSort.RATING, 0, 10), 99);
         assertThat(result.content()).extracting(ExpertData::expertId).containsExactly(2L);
         assertThat(result.totalElements()).isEqualTo(1);
-        // 실제 FK가 없는 ERD에서도 존재하지 않는 마스터 ID는 노출하지 않는다.
-        jdbc.update("INSERT INTO expert_photo_style VALUES (99,1,999)");
-        jdbc.update("INSERT INTO expert_region VALUES (99,1,999)");
         assertThat(queryService.search(condition(null, null, 999L, null, null, null, null, ExpertSort.RATING, 0, 10), 99).content()).isEmpty();
         assertThat(queryService.search(condition(null, null, null, 999L, null, null, null, ExpertSort.RATING, 0, 10), 99).content()).isEmpty();
     }
@@ -226,7 +247,7 @@ class ExpertSearchIntegrationTest {
         var distant = queryService.search(condition(null, null, null, null, null, null, null, ExpertSort.RATING, Integer.MAX_VALUE, 100), 99);
         assertThat(distant.content()).isEmpty();
         assertThat(distant.totalElements()).isEqualTo(4);
-        assertThat(ExpertPageResponse.from(distant, java.util.List.of()).last()).isTrue();
+        assertThat(PageResponse.of(distant.content(), distant.page(), distant.size(), distant.totalElements()).last()).isTrue();
     }
 
     @Test
@@ -244,7 +265,8 @@ class ExpertSearchIntegrationTest {
                 .andExpect(jsonPath("$.result.size").value(10))
                 .andExpect(jsonPath("$.result.totalElements").value(4))
                 .andExpect(jsonPath("$.result.totalPages").value(1))
-                .andExpect(jsonPath("$.result.last").value(true));
+                .andExpect(jsonPath("$.result.last").value(true))
+                .andExpect(jsonPath("$.result.length()").value(6));
         verify(repository).count(any());
         verify(repository).findPage(any(), eq(99L));
         verify(repository).findSpecialties(anyList());
@@ -357,13 +379,27 @@ class ExpertSearchIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(ints = {80000, 90000})
-    void duplicateSpecialtyFailsEvenWithSamePriceOrFilterOnOtherField(int price) throws Exception {
-        jdbc.update("INSERT INTO expert_specialty VALUES (99,1,'SHOOTING',?)", price);
-        mvc.perform(get("/api/experts?keyword=서하&specialty=EDITING").header("Authorization", authorization))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.isSuccess").value(false))
-                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
-        verifyNoInteractions(imageUrlProvider);
+    void databaseRejectsDuplicateSpecialtyRegardlessOfPrice(int price) {
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO expert_specialty (expert_specialty_id, member_id, name, base_price, created_at, updated_at)
+                VALUES (99, 1, 'SHOOTING', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, price)).isInstanceOf(DuplicateKeyException.class);
+    }
+
+    @Test
+    void openApiDocumentsSearchErrorExamplesAndHidesResolvedMemberId() throws Exception {
+        String operation = "$.paths['/api/experts'].get";
+        var response = mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(operation + ".parameters[?(@.name == 'memberId')]").isEmpty());
+        for (ErrorCode error : new ErrorCode[]{ErrorCode.INVALID_REQUEST, ErrorCode.UNAUTHORIZED, ErrorCode.INTERNAL_ERROR}) {
+            String example = operation + ".responses['" + error.getStatus().value()
+                    + "'].content['application/json'].examples['" + error.getCode() + "'].value";
+            response.andExpect(jsonPath(example + ".isSuccess").value(false))
+                    .andExpect(jsonPath(example + ".code").value(error.getCode()))
+                    .andExpect(jsonPath(example + ".message").value(error.getMessage()))
+                    .andExpect(jsonPath(example + ".result").doesNotExist());
+        }
     }
 
     @Test

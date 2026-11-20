@@ -1,6 +1,7 @@
 package cloud.picon.backend.domain.expert.service;
 
 import cloud.picon.backend.domain.expert.dto.*;
+import cloud.picon.backend.global.apipayload.PageResponse;
 import cloud.picon.backend.global.apipayload.code.ErrorCode;
 import cloud.picon.backend.global.apipayload.exception.BusinessException;
 import cloud.picon.backend.global.s3.S3ImageUrlProvider;
@@ -25,7 +26,7 @@ public class ExpertService {
     private final S3ImageUrlProvider imageUrlProvider;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public ExpertPageResponse search(ExpertSearchCondition condition, long memberId) {
+    public PageResponse<ExpertResponse> search(ExpertSearchCondition condition, long memberId) {
         ExpertSearchData data = queryService.search(condition, memberId);
         // 잘못된 프로필 URL을 하나라도 발견하면 서명 전에 요청 전체를 실패시킨다.
         for (ExpertData expert : data.content()) {
@@ -41,7 +42,7 @@ public class ExpertService {
                 expert.expertId(), expert.nickname(), imageUrl(expert.profileImage(), urls),
                 imageUrl(expert.representativeImageKey(), urls), expert.introduction(), expert.specialties(),
                 expert.regions(), expert.careerYears(), expert.rating(), expert.reviewCount(), expert.isFavorite())).toList();
-        return ExpertPageResponse.from(data, content);
+        return PageResponse.of(content, data.page(), data.size(), data.totalElements());
     }
 
     private String imageUrl(String key, Map<String, String> urls) {
