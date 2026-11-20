@@ -8,6 +8,7 @@ import java.time.Duration;
 public record JwtProperties(
         String secret,
         Duration accessTokenExpiration,
-        Duration refreshTokenExpiration
+        Duration refreshTokenExpiration,
+        Duration sessionExpiration
 ) {
 }
