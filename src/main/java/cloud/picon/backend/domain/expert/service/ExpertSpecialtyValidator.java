@@ -15,6 +15,7 @@ import java.util.List;
 public class ExpertSpecialtyValidator {
 
     public void validate(long expertId, List<ExpertSpecialtyResponse> values) {
+        // UNIQUE 제약 도입 전에 저장된 레거시 데이터의 분야 중복을 감지한다.
         var seen = EnumSet.noneOf(Specialty.class);
         for (var value : values) {
             if (!seen.add(value.name())) {
