@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "member")
@@ -29,6 +31,7 @@ public class Member extends BaseTimeEntity {
     private LocalDate birth;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 10)
     private Gender gender;
 
@@ -39,6 +42,7 @@ public class Member extends BaseTimeEntity {
     private String profileImage;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 20)
     private ServiceType serviceType;
 
