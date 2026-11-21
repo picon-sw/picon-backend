@@ -1,5 +1,6 @@
 package cloud.picon.backend.domain.expert.controller;
 
+import cloud.picon.backend.domain.expert.dto.ExpertDetailResponse;
 import cloud.picon.backend.domain.expert.dto.ExpertResponse;
 import cloud.picon.backend.domain.expert.entity.Specialty;
 import cloud.picon.backend.global.apipayload.PageResponse;
@@ -47,5 +48,39 @@ public interface ExpertControllerDocs {
     ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<PageResponse<ExpertResponse>>> search(
             String keyword, Specialty specialty, Long photoStyleId, Long regionCode,
             Integer minPrice, Integer maxPrice, Integer minCareerYears, String sort, int page, int size,
+            @Parameter(hidden = true) Long memberId);
+
+    @Operation(summary = "전문가 상세 정보 조회", description = """
+            등록 전문가 중 공백이 아닌 닉네임이 있는 회원의 상세 정보를 조회합니다. 온보딩 완료 여부로 제한하지 않습니다.
+            expertId는 양수 Long입니다. 없거나 노출 대상이 아닌 전문가 및 일반 회원은 EXPERT_NOT_FOUND입니다.
+            전체 분야·가격, 중복을 제거한 활동 지역과 사진 스타일을 반환합니다. 스타일은 ID 오름차순이며 끊어진 연결은 제외합니다.
+            같은 분야가 중복되면 INTERNAL_ERROR입니다. 관계 데이터가 없으면 빈 배열입니다.
+            평점·리뷰 수·AI 리뷰 요약은 DB 저장값입니다. null·빈 문자열·공백 요약은 null이며 오래된 요약도 그대로 반환합니다.
+            AI 호출·요약 갱신, 포트폴리오 이미지 목록 및 리뷰 원문 목록 조회는 수행하지 않습니다.
+            프로필은 S3 키만 허용합니다. null·빈 값·공백이면 null이며 완성 URL은 서명하지 않고 INTERNAL_ERROR로 처리합니다.
+            GET Presigned URL은 DB 트랜잭션 종료 후 생성합니다. 만료 설정은 600초이며 자격 증명·정책에 따라 더 짧을 수 있습니다.
+            isFavorite는 현재 인증 회원의 찜 기록 존재 여부입니다.
+            """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK: 전문가 상세 조회 성공"),
+            @ApiResponse(responseCode = "400", description = "INVALID_REQUEST: 양수가 아니거나 Long으로 해석할 수 없는 ID",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "INVALID_REQUEST", value = """
+                            {"isSuccess": false, "code": "INVALID_REQUEST", "message": "요청 값이 올바르지 않습니다."}
+                            """))),
+            @ApiResponse(responseCode = "401", description = "UNAUTHORIZED: 인증 실패 또는 잘못된 JWT 회원 ID",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "UNAUTHORIZED", value = """
+                            {"isSuccess": false, "code": "UNAUTHORIZED", "message": "로그인이 필요합니다."}
+                            """))),
+            @ApiResponse(responseCode = "404", description = "EXPERT_NOT_FOUND: 전문가 정보를 찾을 수 없습니다.",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "EXPERT_NOT_FOUND", value = """
+                            {"isSuccess": false, "code": "EXPERT_NOT_FOUND", "message": "전문가 정보를 찾을 수 없습니다."}
+                            """))),
+            @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR: 데이터 무결성·이미지 설정 또는 서버 오류",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "INTERNAL_ERROR", value = """
+                            {"isSuccess": false, "code": "INTERNAL_ERROR", "message": "서버 오류가 발생했습니다."}
+                            """)))
+    })
+    ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<ExpertDetailResponse>> getDetail(
+            @Parameter(description = "전문가 회원 ID", required = true) Long expertId,
             @Parameter(hidden = true) Long memberId);
 }
