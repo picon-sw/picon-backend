@@ -51,6 +51,8 @@ public class Member extends BaseTimeEntity {
 
     private LocalDateTime termsAgreedAt;
 
+    private LocalDateTime marketingAgreedAt;
+
     private LocalDateTime privacyAgreedAt;
 
     private LocalDateTime onboardedAt;
@@ -63,5 +65,19 @@ public class Member extends BaseTimeEntity {
 
     public boolean isOnboarded() {
         return onboardedAt != null;
+    }
+
+    // 약관 동의 일시와 온보딩 완료 일시는 같은 시각으로 기록. 알림 수신은 동의한 경우에만 기록
+    public void completeOnboarding(String nickname, LocalDate birth, Gender gender, String phoneNumber,
+                                   ServiceType serviceType, boolean marketingAgreed, LocalDateTime now) {
+        this.nickname = nickname;
+        this.birth = birth;
+        this.gender = gender;
+        this.phoneNumber = phoneNumber;
+        this.serviceType = serviceType;
+        this.termsAgreedAt = now;
+        this.privacyAgreedAt = now;
+        this.marketingAgreedAt = marketingAgreed ? now : null;
+        this.onboardedAt = now;
     }
 }
