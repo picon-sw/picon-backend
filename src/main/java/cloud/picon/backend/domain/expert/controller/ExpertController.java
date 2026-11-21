@@ -3,6 +3,7 @@ package cloud.picon.backend.domain.expert.controller;
 import cloud.picon.backend.domain.expert.dto.*;
 import cloud.picon.backend.domain.expert.entity.Specialty;
 import cloud.picon.backend.domain.expert.service.ExpertDetailService;
+import cloud.picon.backend.domain.expert.service.ExpertImageService;
 import cloud.picon.backend.domain.expert.service.ExpertService;
 import cloud.picon.backend.global.apipayload.ApiResponse;
 import cloud.picon.backend.global.apipayload.PageResponse;
@@ -20,6 +21,7 @@ public class ExpertController implements ExpertControllerDocs {
 
     private final ExpertService expertService;
     private final ExpertDetailService expertDetailService;
+    private final ExpertImageService expertImageService;
 
     @Override
     @GetMapping
@@ -48,5 +50,19 @@ public class ExpertController implements ExpertControllerDocs {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
         return ResponseEntity.ok(ApiResponse.onSuccess(expertDetailService.getDetail(expertId, memberId)));
+    }
+
+    @Override
+    @GetMapping("/{expertId}/images")
+    public ResponseEntity<ApiResponse<PageResponse<ExpertImageResponse>>> getImages(
+            @PathVariable Long expertId,
+            @RequestParam(required = false) Specialty specialty,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @LoginMemberId Long memberId) {
+        if (expertId <= 0 || page < 0 || size < 1 || size > 100) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        return ResponseEntity.ok(ApiResponse.onSuccess(expertImageService.getImages(expertId, specialty, page, size)));
     }
 }

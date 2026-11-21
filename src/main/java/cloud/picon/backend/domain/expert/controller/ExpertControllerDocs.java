@@ -1,6 +1,7 @@
 package cloud.picon.backend.domain.expert.controller;
 
 import cloud.picon.backend.domain.expert.dto.ExpertDetailResponse;
+import cloud.picon.backend.domain.expert.dto.ExpertImageResponse;
 import cloud.picon.backend.domain.expert.dto.ExpertResponse;
 import cloud.picon.backend.domain.expert.entity.Specialty;
 import cloud.picon.backend.global.apipayload.PageResponse;
@@ -80,4 +81,22 @@ public interface ExpertControllerDocs {
     ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<ExpertDetailResponse>> getDetail(
             @Parameter(description = "전문가 회원 ID", required = true) Long expertId,
             @Parameter(hidden = true) Long memberId);
+
+    @Operation(summary = "전문가 포트폴리오 이미지 목록 조회", description = """
+            닉네임이 설정된 등록 전문가의 이미지를 최신순으로 반환합니다. 생성 시각이 같으면 이미지 ID가 큰 항목이 먼저 표시됩니다.
+            specialty는 SHOOTING 또는 EDITING이며, 생략하면 전체 분야를 조회합니다.
+            page는 0부터 시작하고 기본값은 0입니다. size는 기본 10이며 1~100을 허용합니다.
+            이미지가 없거나 범위를 벗어난 페이지의 content는 빈 배열입니다.
+            imageUrl은 만료될 수 있는 이미지 조회 URL입니다. createdAt은 시간대 변환 없이 ISO 형식으로 반환합니다.
+            """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK: 이미지 페이지 조회 성공"),
+            @ApiResponse(responseCode = "400", description = "INVALID_REQUEST: 잘못된 전문가 ID·분야·페이지·크기"),
+            @ApiResponse(responseCode = "401", description = "UNAUTHORIZED: 인증 실패 또는 잘못된 JWT 회원 ID"),
+            @ApiResponse(responseCode = "404", description = "EXPERT_NOT_FOUND: 미등록 전문가 또는 닉네임이 비어 있는 전문가"),
+            @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR: 저장 데이터·이미지 조회 한계 또는 서버 오류")
+    })
+    ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<PageResponse<ExpertImageResponse>>> getImages(
+            @Parameter(description = "전문가 회원 ID", required = true) Long expertId,
+            Specialty specialty, int page, int size, @Parameter(hidden = true) Long memberId);
 }

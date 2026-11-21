@@ -30,4 +30,23 @@ public interface ExpertImageRepository extends JpaRepository<ExpertImage, Long> 
 
     @Query(value = COUNT_QUERY, nativeQuery = true)
     long countPortfolioImages(@Param("specialty") String specialty);
+
+    String EXPERT_IMAGES_FROM_AND_FILTER = """
+            FROM expert_image i
+            WHERE i.member_id = :expertId AND (:specialty IS NULL OR i.specialty = :specialty)
+            """;
+    String EXPERT_IMAGES_COUNT_QUERY = "SELECT COUNT(*) " + EXPERT_IMAGES_FROM_AND_FILTER;
+
+    // DATETIME을 문자로 읽어 native JDBC TIMESTAMP 변환의 시간대 이동을 피한다.
+    @Query(value = """
+            SELECT i.expert_image_id AS imageId, i.image_key AS imageKey,
+                   i.specialty AS specialty, CAST(i.created_at AS CHAR(32)) AS createdAtText
+            """ + EXPERT_IMAGES_FROM_AND_FILTER + """
+            ORDER BY i.created_at DESC, i.expert_image_id DESC
+            """, countQuery = EXPERT_IMAGES_COUNT_QUERY, nativeQuery = true)
+    Page<ExpertImageView> findExpertImages(@Param("expertId") long expertId,
+                                         @Param("specialty") String specialty, Pageable pageable);
+
+    @Query(value = EXPERT_IMAGES_COUNT_QUERY, nativeQuery = true)
+    long countExpertImages(@Param("expertId") long expertId, @Param("specialty") String specialty);
 }
