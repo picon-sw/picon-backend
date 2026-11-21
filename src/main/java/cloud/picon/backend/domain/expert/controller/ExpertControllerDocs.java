@@ -1,5 +1,6 @@
 package cloud.picon.backend.domain.expert.controller;
 
+import cloud.picon.backend.domain.expert.dto.ExpertDetailResponse;
 import cloud.picon.backend.domain.expert.dto.ExpertResponse;
 import cloud.picon.backend.domain.expert.entity.Specialty;
 import cloud.picon.backend.global.apipayload.PageResponse;
@@ -47,5 +48,36 @@ public interface ExpertControllerDocs {
     ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<PageResponse<ExpertResponse>>> search(
             String keyword, Specialty specialty, Long photoStyleId, Long regionCode,
             Integer minPrice, Integer maxPrice, Integer minCareerYears, String sort, int page, int size,
+            @Parameter(hidden = true) Long memberId);
+
+    @Operation(summary = "전문가 상세 정보 조회", description = """
+            등록 전문가 중 닉네임이 설정된 회원의 상세 정보를 조회합니다. 온보딩 완료 여부와 관계없이 조회할 수 있습니다.
+            specialties는 분야와 기본 가격, regions는 활동 지역, photoStyles는 ID 오름차순의 사진 스타일을 담습니다.
+            관계 데이터가 없으면 해당 필드는 빈 배열입니다.
+            profileImage는 만료될 수 있는 이미지 조회 URL이며, 이미지가 없으면 null입니다.
+            rating과 reviewCount는 평점과 리뷰 수입니다. reviewSummary는 저장된 AI 리뷰 요약이며, 비어 있으면 null입니다.
+            isFavorite는 로그인한 회원이 해당 전문가를 찜했는지 나타냅니다.
+            """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK: 전문가 상세 조회 성공"),
+            @ApiResponse(responseCode = "400", description = "INVALID_REQUEST: 양수가 아니거나 Long으로 해석할 수 없는 ID",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "INVALID_REQUEST", value = """
+                            {"isSuccess": false, "code": "INVALID_REQUEST", "message": "요청 값이 올바르지 않습니다."}
+                            """))),
+            @ApiResponse(responseCode = "401", description = "UNAUTHORIZED: 인증 실패 또는 잘못된 JWT 회원 ID",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "UNAUTHORIZED", value = """
+                            {"isSuccess": false, "code": "UNAUTHORIZED", "message": "로그인이 필요합니다."}
+                            """))),
+            @ApiResponse(responseCode = "404", description = "EXPERT_NOT_FOUND: 미등록 전문가 또는 닉네임이 비어 있는 전문가",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "EXPERT_NOT_FOUND", value = """
+                            {"isSuccess": false, "code": "EXPERT_NOT_FOUND", "message": "전문가 정보를 찾을 수 없습니다."}
+                            """))),
+            @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR: 중복 분야 데이터 또는 서버 오류",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "INTERNAL_ERROR", value = """
+                            {"isSuccess": false, "code": "INTERNAL_ERROR", "message": "서버 오류가 발생했습니다."}
+                            """)))
+    })
+    ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<ExpertDetailResponse>> getDetail(
+            @Parameter(description = "전문가 회원 ID", required = true) Long expertId,
             @Parameter(hidden = true) Long memberId);
 }

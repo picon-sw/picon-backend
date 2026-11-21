@@ -2,9 +2,12 @@ package cloud.picon.backend.domain.expert.controller;
 
 import cloud.picon.backend.domain.expert.dto.*;
 import cloud.picon.backend.domain.expert.entity.Specialty;
+import cloud.picon.backend.domain.expert.service.ExpertDetailService;
 import cloud.picon.backend.domain.expert.service.ExpertService;
 import cloud.picon.backend.global.apipayload.ApiResponse;
 import cloud.picon.backend.global.apipayload.PageResponse;
+import cloud.picon.backend.global.apipayload.code.ErrorCode;
+import cloud.picon.backend.global.apipayload.exception.BusinessException;
 import cloud.picon.backend.global.jwt.LoginMemberId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class ExpertController implements ExpertControllerDocs {
 
     private final ExpertService expertService;
+    private final ExpertDetailService expertDetailService;
 
     @Override
     @GetMapping
@@ -34,5 +38,15 @@ public class ExpertController implements ExpertControllerDocs {
         ExpertSearchCondition condition = new ExpertSearchCondition(keyword, specialty, photoStyleId, regionCode,
                 minPrice, maxPrice, minCareerYears, ExpertSort.from(sort == null ? "rating" : sort), page, size);
         return ResponseEntity.ok(ApiResponse.onSuccess(expertService.search(condition, memberId)));
+    }
+
+    @Override
+    @GetMapping("/{expertId}")
+    public ResponseEntity<ApiResponse<ExpertDetailResponse>> getDetail(
+            @PathVariable Long expertId, @LoginMemberId Long memberId) {
+        if (expertId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        return ResponseEntity.ok(ApiResponse.onSuccess(expertDetailService.getDetail(expertId, memberId)));
     }
 }

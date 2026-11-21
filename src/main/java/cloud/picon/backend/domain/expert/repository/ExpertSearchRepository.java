@@ -16,7 +16,7 @@ public class ExpertSearchRepository {
 
     // Unicode White_Space를 명시해 MySQL ICU와 H2 Java 정규식의 공백 판정을 일치시킨다.
     // ASCII U+0009~U+000D는 탭·개행·수직 탭·폼 피드·캐리지 리턴이다.
-    private static final String NON_WHITESPACE_PATTERN =
+    static final String NON_WHITESPACE_PATTERN =
             "[^\t-\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]";
 
     private final NamedParameterJdbcTemplate jdbc;
