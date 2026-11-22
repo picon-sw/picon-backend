@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -35,7 +36,7 @@ public class ExpertImageService {
         Map<String, String> urls = new HashMap<>();
         var content = images.stream().map(image -> new ExpertImageResponse(image.imageId(),
                 imageUrl(image, urls),
-                image.specialty(), image.createdAt())).toList();
+                image.specialty(), image.createdAt().atOffset(ZoneOffset.UTC))).toList();
         return PageResponse.of(content, page, size, images.getTotalElements());
     }
 
@@ -53,7 +54,7 @@ public class ExpertImageService {
         String key = image.imageKey();
         if (key == null || key.codePoints().allMatch(codePoint -> Character.isWhitespace(codePoint)
                 || Character.isSpaceChar(codePoint) || codePoint == 0x85)
-                || URL_PREFIX.matcher(key.strip()).find()) {
+                || ExpertImageKey.hasUrlPrefix(key, URL_PREFIX)) {
             log.error("포트폴리오 이미지 키 무결성 오류: imageId={}", image.imageId());
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }

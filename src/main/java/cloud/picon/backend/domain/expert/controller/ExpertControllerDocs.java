@@ -87,14 +87,26 @@ public interface ExpertControllerDocs {
             specialty는 SHOOTING 또는 EDITING이며, 생략하면 전체 분야를 조회합니다.
             page는 0부터 시작하고 기본값은 0입니다. size는 기본 10이며 1~100을 허용합니다.
             이미지가 없거나 범위를 벗어난 페이지의 content는 빈 배열입니다.
-            imageUrl은 만료될 수 있는 이미지 조회 URL입니다. createdAt은 시간대 변환 없이 ISO 형식으로 반환합니다.
+            imageUrl은 만료될 수 있는 이미지 조회 URL입니다. createdAt은 UTC 오프셋(Z)을 포함한 ISO 8601 형식입니다.
             """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "OK: 이미지 페이지 조회 성공"),
-            @ApiResponse(responseCode = "400", description = "INVALID_REQUEST: 잘못된 전문가 ID·분야·페이지·크기"),
-            @ApiResponse(responseCode = "401", description = "UNAUTHORIZED: 인증 실패 또는 잘못된 JWT 회원 ID"),
-            @ApiResponse(responseCode = "404", description = "EXPERT_NOT_FOUND: 미등록 전문가 또는 닉네임이 비어 있는 전문가"),
-            @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR: 저장 데이터·이미지 조회 한계 또는 서버 오류")
+            @ApiResponse(responseCode = "400", description = "INVALID_REQUEST: 잘못된 전문가 ID·분야·페이지·크기",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "INVALID_REQUEST", value = """
+                            {"isSuccess": false, "code": "INVALID_REQUEST", "message": "요청 값이 올바르지 않습니다."}
+                            """))),
+            @ApiResponse(responseCode = "401", description = "UNAUTHORIZED: 인증 실패 또는 잘못된 JWT 회원 ID",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "UNAUTHORIZED", value = """
+                            {"isSuccess": false, "code": "UNAUTHORIZED", "message": "로그인이 필요합니다."}
+                            """))),
+            @ApiResponse(responseCode = "404", description = "EXPERT_NOT_FOUND: 미등록 전문가 또는 닉네임이 비어 있는 전문가",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "EXPERT_NOT_FOUND", value = """
+                            {"isSuccess": false, "code": "EXPERT_NOT_FOUND", "message": "전문가 정보를 찾을 수 없습니다."}
+                            """))),
+            @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR: 서버가 이미지 목록 요청을 처리하지 못함",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "INTERNAL_ERROR", value = """
+                            {"isSuccess": false, "code": "INTERNAL_ERROR", "message": "서버 오류가 발생했습니다."}
+                            """)))
     })
     ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<PageResponse<ExpertImageResponse>>> getImages(
             @Parameter(description = "전문가 회원 ID", required = true) Long expertId,

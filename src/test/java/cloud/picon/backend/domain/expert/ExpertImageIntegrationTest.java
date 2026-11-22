@@ -4,6 +4,7 @@ import cloud.picon.backend.domain.expert.repository.ExpertDetailRepository;
 import cloud.picon.backend.domain.expert.service.ExpertImageService;
 import cloud.picon.backend.global.jwt.JwtProvider;
 import cloud.picon.backend.global.s3.S3ImageUrlProvider;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.util.Map;
+import java.util.TimeZone;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.*;
 import static org.hamcrest.Matchers.contains;
 import static org.mockito.ArgumentMatchers.*;
@@ -39,7 +43,10 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:expert-images-test;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=MEMBER")
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:expert-images-test;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=MEMBER",
+        "springdoc.api-docs.enabled=true"
+})
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 class ExpertImageIntegrationTest {
@@ -96,7 +103,7 @@ class ExpertImageIntegrationTest {
     }
 
     @Test
-    void returnsOnlyRequestedExpertsImagesInStableLatestOrderAndStoredLocalTime() throws Exception {
+    void returnsOnlyRequestedExpertsImagesInStableLatestOrderWithUtcOffset() throws Exception {
         mvc.perform(get("/api/experts/1/images").header("Authorization", authorization))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSuccess").value(true))
@@ -104,8 +111,8 @@ class ExpertImageIntegrationTest {
                 .andExpect(jsonPath("$.result.content[*].imageId", contains(103, 102, 101)))
                 .andExpect(jsonPath("$.result.content[*].specialty", contains("SHOOTING", "EDITING", "SHOOTING")))
                 .andExpect(jsonPath("$.result.content[0].imageUrl").value("https://signed.example/portfolio/103.jpg"))
-                .andExpect(jsonPath("$.result.content[0].createdAt").value("2026-11-11T15:00:00"))
-                .andExpect(jsonPath("$.result.content[2].createdAt").value("2026-11-10T14:30:00"))
+                .andExpect(jsonPath("$.result.content[0].createdAt").value("2026-11-11T15:00:00Z"))
+                .andExpect(jsonPath("$.result.content[2].createdAt").value("2026-11-10T14:30:00Z"))
                 .andExpect(jsonPath("$.result.content[0].expertId").doesNotExist())
                 .andExpect(jsonPath("$.result.content[0].expertNickname").doesNotExist())
                 .andExpect(jsonPath("$.result.content[0].portfolioId").doesNotExist())
@@ -122,6 +129,54 @@ class ExpertImageIntegrationTest {
     }
 
     @Test
+    void nonUtcDefaultTimezoneDoesNotShiftStoredTime() throws Exception {
+        TimeZone previous = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
+            mvc.perform(get("/api/experts/1/images").header("Authorization", authorization))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.content[0].createdAt").value("2026-11-11T15:00:00Z"));
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "400, INVALID_REQUEST, /api/experts/0/images",
+            "401, UNAUTHORIZED, /api/experts/1/images",
+            "404, EXPERT_NOT_FOUND, /api/experts/999/images",
+            "500, INTERNAL_ERROR, /api/experts/1/images"
+    })
+    void swaggerErrorExampleMatchesHttpResponse(int statusCode, String code, String path) throws Exception {
+        if (statusCode == 500) {
+            when(imageUrlProvider.getImageUrl(anyString())).thenThrow(new IllegalStateException("signing failed"));
+        }
+        var request = get(path);
+        if (statusCode != 401) {
+            request.header("Authorization", authorization);
+        }
+        var actual = mvc.perform(request).andExpect(status().is(statusCode))
+                .andReturn().getResponse().getContentAsByteArray();
+        var openApi = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        String examplePath = "$.paths['/api/experts/{expertId}/images'].get.responses['" + statusCode
+                + "'].content['application/json'].examples['" + code + "'].value";
+        Map<?, ?> example = JsonPath.read(new String(openApi, UTF_8), examplePath);
+        Map<?, ?> response = JsonPath.read(new String(actual, UTF_8), "$");
+        assertThat(example).isEqualTo(response);
+    }
+
+    @Test
+    void nonHttpSchemePrefixRemainsAnAllowedPortfolioKey() throws Exception {
+        String key = " custom+scheme://portfolio/image.jpg";
+        jdbc.update("UPDATE expert_image SET image_key = ? WHERE expert_image_id = 103", key);
+        mvc.perform(get("/api/experts/1/images").header("Authorization", authorization))
+                .andExpect(status().isOk());
+        verify(imageUrlProvider).getImageUrl(key);
+    }
+
+    @Test
     void anotherExpertsImagesDoNotLeak() throws Exception {
         mvc.perform(get("/api/experts/2/images").header("Authorization", authorization))
                 .andExpect(status().isOk())
@@ -130,11 +185,11 @@ class ExpertImageIntegrationTest {
     }
 
     @Test
-    void fractionalStoredLocalTimeIsPreservedWithoutTimezoneConversion() throws Exception {
+    void fractionalStoredTimeIsPreservedWithUtcOffset() throws Exception {
         jdbc.update("UPDATE expert_image SET created_at = '2026-11-10 14:30:00.123456' WHERE expert_image_id = 101");
         mvc.perform(get("/api/experts/1/images").header("Authorization", authorization))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.content[2].createdAt").value("2026-11-10T14:30:00.123456"));
+                .andExpect(jsonPath("$.result.content[2].createdAt").value("2026-11-10T14:30:00.123456Z"));
     }
 
     @Test
