@@ -46,4 +46,15 @@ public class ExpertDetailRepository {
                 """, new MapSqlParameterSource("expertId", expertId),
                 (rs, index) -> new ExpertPhotoStyleResponse(rs.getLong("photo_style_id"), rs.getString("name")));
     }
+
+    public boolean existsVisibleExpert(long expertId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM expert e JOIN member m ON m.member_id = e.member_id
+                    WHERE e.member_id = :expertId AND m.nickname IS NOT NULL
+                      AND REGEXP_LIKE(m.nickname, :nonWhitespacePattern)
+                )
+                """, new MapSqlParameterSource("expertId", expertId)
+                .addValue("nonWhitespacePattern", ExpertSearchRepository.NON_WHITESPACE_PATTERN), Boolean.class));
+    }
 }
