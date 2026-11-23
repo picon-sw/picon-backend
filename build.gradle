@@ -54,5 +54,7 @@ dependencyManagement {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
+    // 테스트도 앱과 같은 UTC 시간대로 실행
+    jvmArgs '-Duser.timezone=UTC'
 }
