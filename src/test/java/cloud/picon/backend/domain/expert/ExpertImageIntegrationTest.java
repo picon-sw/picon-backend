@@ -42,10 +42,13 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:expert-images-test;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=MEMBER",
-        "springdoc.api-docs.enabled=true"
+        "springdoc.api-docs.enabled=true",
+        "app.swagger.username=swagger-test",
+        "app.swagger.password=swagger-test"
 })
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -158,7 +161,8 @@ class ExpertImageIntegrationTest {
         }
         var actual = mvc.perform(request).andExpect(status().is(statusCode))
                 .andReturn().getResponse().getContentAsByteArray();
-        var openApi = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+        var openApi = mvc.perform(get("/api/v3/api-docs").with(httpBasic("swagger-test", "swagger-test")))
+                .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
         String examplePath = "$.paths['/api/experts/{expertId}/images'].get.responses['" + statusCode
                 + "'].content['application/json'].examples['" + code + "'].value";

@@ -41,7 +41,8 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain swaggerFilterChain(
             HttpSecurity http,
-            @Value("${springdoc.swagger-ui.enabled:false}") boolean swaggerEnabled,
+            @Value("${springdoc.swagger-ui.enabled:false}") boolean swaggerUiEnabled,
+            @Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled,
             @Value("${app.swagger.username:}") String username,
             @Value("${app.swagger.password:}") String password) throws Exception {
         http
@@ -49,7 +50,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        if (!swaggerEnabled) {
+        // 화면(swagger-ui)과 문서(api-docs) 중 하나라도 켜져 있으면 인증 후 허용
+        if (!swaggerUiEnabled && !apiDocsEnabled) {
             http.authorizeHttpRequests(auth -> auth.anyRequest().denyAll());
             return http.build();
         }
