@@ -31,8 +31,10 @@ public class SecurityConfig {
             Set.of("/api/auth/kakao", "/api/auth/refresh", "/api/auth/logout");
 
     // Nginx가 /api 요청만 백엔드로 넘기므로 Swagger도 /api 아래에 둠
-    private static final String[] SWAGGER_PATHS =
-            {"/api/swagger-ui.html", "/api/swagger-ui/**", "/api/v3/api-docs/**"};
+    // api-docs.yaml은 springdoc이 따로 여는 YAML 문서 경로라 함께 보호
+    private static final String[] SWAGGER_PATHS = {
+            "/api/swagger-ui.html", "/api/swagger-ui/**",
+            "/api/v3/api-docs/**", "/api/v3/api-docs.yaml/**"};
 
     private final SecurityErrorHandler securityErrorHandler;
 
