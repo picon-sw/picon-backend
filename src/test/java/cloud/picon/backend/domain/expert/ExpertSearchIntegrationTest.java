@@ -38,10 +38,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:expert-search-test;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=MEMBER",
-        "springdoc.api-docs.enabled=true"
+        "springdoc.api-docs.enabled=true",
+        "app.swagger.username=swagger-test",
+        "app.swagger.password=swagger-test"
 })
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -389,7 +392,7 @@ class ExpertSearchIntegrationTest {
     @Test
     void openApiDocumentsSearchErrorExamplesAndHidesResolvedMemberId() throws Exception {
         String operation = "$.paths['/api/experts'].get";
-        var response = mvc.perform(get("/v3/api-docs"))
+        var response = mvc.perform(get("/api/v3/api-docs").with(httpBasic("swagger-test", "swagger-test")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(operation + ".parameters[?(@.name == 'memberId')]").isEmpty());
         for (ErrorCode error : new ErrorCode[]{ErrorCode.INVALID_REQUEST, ErrorCode.UNAUTHORIZED, ErrorCode.INTERNAL_ERROR}) {
