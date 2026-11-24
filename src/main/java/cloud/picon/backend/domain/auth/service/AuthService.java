@@ -74,9 +74,9 @@ public class AuthService {
                 .orElseThrow(this::invalidRefreshToken);
         Duration sessionRemaining = refreshTokenRepository.findSessionRemaining(sessionId, memberId)
                 .orElseThrow(this::invalidRefreshToken);
-        if (!memberRepository.existsById(memberId)) {
-            throw invalidRefreshToken();
-        }
+        // 온보딩 여부를 응답에 담기 위해 회원을 조회
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(this::invalidRefreshToken);
 
         // 새 토큰은 세션에 남은 시간보다 길게 주지 않음 (최대 유지 기간 보장)
         Duration refreshTtl = shorter(jwtProperties.refreshTokenExpiration(), sessionRemaining);
@@ -90,7 +90,8 @@ public class AuthService {
 
         TokenRefreshResponse response = new TokenRefreshResponse(
                 tokens.accessToken(),
-                jwtProvider.getAccessTokenExpiresIn());
+                jwtProvider.getAccessTokenExpiresIn(),
+                member.isOnboarded());
         return new TokenRefreshResult(response, tokens.refreshToken());
     }
 

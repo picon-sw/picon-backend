@@ -47,6 +47,7 @@ public interface AuthControllerDocs {
                     refresh_token 쿠키로 Access Token을 재발급합니다. Access Token 없이 호출합니다.
                     재발급할 때마다 새 Refresh Token을 Set-Cookie로 전달하고, 이전 Refresh Token은 무효가 됩니다.
                     동시에 여러 번 호출하면 첫 번째만 성공합니다.
+                    isOnboarded로 새로고침 후에도 온보딩 화면으로 보낼지 판단할 수 있습니다.
                     """)
     @SecurityRequirements
     @ApiResponses({
