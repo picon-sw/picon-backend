@@ -29,7 +29,7 @@ app:
       max-tokens: 256
       connect-timeout: 3s
       read-timeout: 30s
-      prompt: ${CLAUDE_REVIEW_SUMMARY_PROMPT:}
+      prompt: ${CLAUDE_REVIEW_SUMMARY_PROMPT:classpath:prompts/review-summary.txt}
   s3:
     fake-image-url: ${S3_FAKE_IMAGE_URL:false}
     bucket: ${S3_BUCKET:}
