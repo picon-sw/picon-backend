@@ -23,7 +23,7 @@ CREATE TABLE proposal (
     member_id BIGINT NOT NULL,
     UNIQUE (request_id, member_id),
     FOREIGN KEY (request_id) REFERENCES `request` (request_id),
-    FOREIGN KEY (member_id) REFERENCES member (member_id)
+    FOREIGN KEY (member_id) REFERENCES expert (member_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE reservation (

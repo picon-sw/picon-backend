@@ -1,6 +1,7 @@
 package cloud.picon.backend.domain.review;
 
 import cloud.picon.backend.domain.review.repository.ReviewRepository;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -17,13 +18,16 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.mockito.Mockito.doThrow;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,7 +35,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:review-api-test;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=MEMBER",
-        "spring.jpa.hibernate.ddl-auto=none"
+        "spring.jpa.hibernate.ddl-auto=none",
+        "springdoc.api-docs.enabled=true",
+        "app.swagger.username=swagger-test",
+        "app.swagger.password=swagger-test"
 })
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -84,6 +91,58 @@ class ReviewApiIntegrationTest {
         mvc.perform(get("/api/experts/10/reviews").with(jwt().jwt(token -> token.subject("2"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.content[?(@.reviewId == 401)].reviewTags[0]").value("friendly"));
+    }
+
+    @Test
+    void returnsTheSameUtcCreationTimeInRegistrationAndListing() throws Exception {
+        var registered = mvc.perform(post("/api/reservations/302/reviews").with(jwt().jwt(token -> token.subject("2")))
+                        .contentType("application/json").content("{\"rating\":5}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse();
+        String createdAt = JsonPath.read(registered.getContentAsString(), "$.result.createdAt");
+        assertThat(createdAt).endsWith("Z");
+        mvc.perform(get("/api/experts/10/reviews").with(jwt().jwt(token -> token.subject("2"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.content[0].createdAt").value(createdAt));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[\"친절해요\", \"응답이 빨라요\"]", "[]", "null"})
+    void acceptsStringArraysEmptyArraysAndNullTags(String tags) throws Exception {
+        mvc.perform(post("/api/reservations/302/reviews").with(jwt().jwt(token -> token.subject("2")))
+                        .contentType("application/json").content("{\"rating\":5,\"reviewTags\":" + tags + "}"))
+                .andExpect(status().isCreated())
+                .andExpect(content().json("{\"result\":{\"reviewTags\":" + tags + "}}"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[1]", "[{\"tag\":\"친절해요\"}]", "[\"친절해요\", null]", "[true]", "[[\"친절해요\"]]"})
+    void rejectsNonStringTagElements(String tags) throws Exception {
+        mvc.perform(post("/api/reservations/302/reviews").with(jwt().jwt(token -> token.subject("2")))
+                        .contentType("application/json").content("{\"rating\":5,\"reviewTags\":" + tags + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM review", Integer.class)).isZero();
+    }
+
+    @Test
+    void listsPreviouslyStoredNonStringTagElements() throws Exception {
+        var now = LocalDateTime.of(2026, 11, 26, 9, 0);
+        repository.insert(new ReviewRepository.NewReview(302, 5, "[1,true,null]", null, now, now));
+        mvc.perform(get("/api/experts/10/reviews").with(jwt().jwt(token -> token.subject("2"))))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"result\":{\"content\":[{\"reviewTags\":[1,true,null]}]}}"));
+    }
+
+    @Test
+    void documentsStringArrayTagsAndUtcCreationTime() throws Exception {
+        mvc.perform(get("/api/v3/api-docs").with(httpBasic("swagger-test", "swagger-test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.schemas.ReviewCreateRequest.properties.reviewTags.type")
+                        .value(containsInAnyOrder("array", "null")))
+                .andExpect(jsonPath("$.components.schemas.ReviewCreateRequest.properties.reviewTags.items.type").value("string"))
+                .andExpect(jsonPath("$.components.schemas.ReviewResponse.properties.createdAt.example")
+                        .value("2026-11-26T09:00:00Z"));
     }
 
     @Test

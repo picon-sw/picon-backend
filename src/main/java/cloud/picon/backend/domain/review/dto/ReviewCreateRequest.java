@@ -6,5 +6,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 
 public record ReviewCreateRequest(@NotNull @Schema(type = "integer", minimum = "1", maximum = "5") JsonNode rating,
+                                  @Schema(implementation = String[].class, nullable = true)
                                   ArrayNode reviewTags, String reviewContent) {
 }

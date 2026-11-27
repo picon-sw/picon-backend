@@ -23,33 +23,20 @@ class MySqlReviewApiIntegrationTest extends ReviewApiIntegrationTest {
 
     @DynamicPropertySource
     static void isolatedMySql(DynamicPropertyRegistry properties) {
-        int port = Integer.parseInt(System.getenv("PICON_REVIEW_MYSQL_PORT"));
-        if (port < 1024 || port > 65535 || port == 3306 || port == 3307 || port == 33060) {
-            throw new IllegalStateException("Use a separate local test port");
-        }
-        properties.add("spring.datasource.url",
-                () -> "jdbc:mysql://127.0.0.1:" + port + "/" + SCHEMA + "?sslMode=DISABLED&allowPublicKeyRetrieval=true");
-        properties.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        properties.add("spring.datasource.username", () -> "review_test");
-        properties.add("spring.datasource.password", () -> System.getenv("PICON_REVIEW_MYSQL_PASSWORD"));
+        ReviewMySqlTestDatabase.configure(properties, SCHEMA, false);
     }
 
     @Override
     @BeforeEach
     void setUp() {
-        String hostname = System.getenv("PICON_REVIEW_MYSQL_HOSTNAME");
-        if (hostname == null || !hostname.matches("picon-review-mysql-43-[a-z0-9]+")) {
-            throw new IllegalStateException("Expected the hostname of the disposable MySQL test container");
-        }
-        assertThat(jdbc.queryForObject("SELECT @@hostname", String.class)).isEqualTo(hostname);
-        assertThat(jdbc.queryForObject("SELECT DATABASE()", String.class)).isEqualTo(SCHEMA);
-        assertThat(jdbc.queryForObject("SELECT VERSION()", String.class)).startsWith("8.4.");
         recreateSchema("review/mysql-repository-fixture.sql");
     }
 
     @Test
     void enforcesActualForeignKeyUniqueAndRatingConstraints() {
         assertThatThrownBy(() -> jdbc.update("INSERT INTO proposal VALUES (900, 999, 10)"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("INSERT INTO proposal VALUES (900, 101, 1)"))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("INSERT INTO reservation VALUES (900, 999, 'COMPLETED')"))
                 .isInstanceOf(DataIntegrityViolationException.class);

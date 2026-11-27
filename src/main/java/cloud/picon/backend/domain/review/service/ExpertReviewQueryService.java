@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 
+import java.time.ZoneOffset;
+
 @Service
 @RequiredArgsConstructor
 public class ExpertReviewQueryService {
@@ -28,7 +30,7 @@ public class ExpertReviewQueryService {
         long total = reviews.countByExpertId(expertId);
         var content = reviews.findPage(expertId, size, (long) page * size).stream()
                 .map(row -> new ReviewResponse(row.reviewId(), row.rating(), readTags(row.tagsJson()),
-                        row.content(), row.createdAt()))
+                        row.content(), row.createdAt().atOffset(ZoneOffset.UTC)))
                 .toList();
         return PageResponse.of(content, page, size, total);
     }

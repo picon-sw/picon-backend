@@ -27,7 +27,7 @@ public interface ReviewControllerDocs {
     @Operation(summary = "리뷰 등록", security = @SecurityRequirement(name = "bearerAuth"),
             description = "완료된 예약의 의뢰 회원이 리뷰를 작성합니다. 별점은 1~5점입니다. "
                     + "본문은 선택이며 최대 2,000 Unicode 코드 포인트입니다. "
-                    + "태그는 선택 JSON 배열이며 직렬화한 UTF-8 크기가 최대 16 KiB입니다.")
+                    + "태그는 선택 JSON 문자열 배열이며 직렬화한 UTF-8 크기가 최대 16 KiB입니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "리뷰 등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청",

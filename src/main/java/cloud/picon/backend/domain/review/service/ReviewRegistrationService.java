@@ -39,6 +39,13 @@ public class ReviewRegistrationService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
         var tags = request.reviewTags();
+        if (tags != null) {
+            for (var tag : tags) {
+                if (!tag.isString()) {
+                    throw new BusinessException(ErrorCode.INVALID_REQUEST);
+                }
+            }
+        }
         String tagsJson = tags == null ? null : tags.toString();
         if (tagsJson != null && tagsJson.getBytes(StandardCharsets.UTF_8).length > MAX_TAGS_JSON_BYTES) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
@@ -74,6 +81,6 @@ public class ReviewRegistrationService {
             throw e;
         }
         repository.refreshExpertRating(context.expertId());
-        return new ReviewResponse(reviewId, rating, tags, content, now);
+        return new ReviewResponse(reviewId, rating, tags, content, now.atOffset(ZoneOffset.UTC));
     }
 }
