@@ -28,10 +28,10 @@ public class ExpertDetailRepository {
                        EXISTS (SELECT 1 FROM favorite f WHERE f.member_id = :viewerId
                                AND f.expert_member_id = e.member_id) AS favorite
                 FROM expert e JOIN member m ON m.member_id = e.member_id
-                WHERE e.member_id = :expertId AND m.nickname IS NOT NULL
-                  AND REGEXP_LIKE(m.nickname, :nonWhitespacePattern)
-                """, new MapSqlParameterSource("expertId", expertId).addValue("viewerId", memberId)
-                        .addValue("nonWhitespacePattern", ExpertSearchRepository.NON_WHITESPACE_PATTERN),
+                WHERE e.member_id = :expertId AND
+                """ + ExpertVisibility.NICKNAME_CONDITION,
+                new MapSqlParameterSource("expertId", expertId).addValue("viewerId", memberId)
+                        .addValue("nonWhitespacePattern", ExpertVisibility.NON_WHITESPACE_PATTERN),
                 (rs, index) -> new ExpertDetailRow(rs.getLong("member_id"), rs.getString("nickname"),
                         rs.getString("profile_image"), rs.getString("introduction"), rs.getInt("career_years"),
                         rs.getBigDecimal("avg_rating"), rs.getInt("review_count"), rs.getString("review_summary"),
@@ -51,10 +51,9 @@ public class ExpertDetailRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (
                     SELECT 1 FROM expert e JOIN member m ON m.member_id = e.member_id
-                    WHERE e.member_id = :expertId AND m.nickname IS NOT NULL
-                      AND REGEXP_LIKE(m.nickname, :nonWhitespacePattern)
-                )
-                """, new MapSqlParameterSource("expertId", expertId)
-                .addValue("nonWhitespacePattern", ExpertSearchRepository.NON_WHITESPACE_PATTERN), Boolean.class));
+                    WHERE e.member_id = :expertId AND
+                """ + ExpertVisibility.NICKNAME_CONDITION + ")",
+                new MapSqlParameterSource("expertId", expertId)
+                        .addValue("nonWhitespacePattern", ExpertVisibility.NON_WHITESPACE_PATTERN), Boolean.class));
     }
 }
