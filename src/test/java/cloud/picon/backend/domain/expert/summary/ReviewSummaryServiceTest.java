@@ -87,6 +87,29 @@ class ReviewSummaryServiceTest {
         assertInvalidResponse();
     }
 
+    @Test
+    void rejectsFourKoreanSentencesWhenLaterSentencesStartWithDigits() {
+        returnsSummary("분위기가 편안해요. 1주일 안에 사진을 받아요. 2가지 색감이 좋아요. 3가지 포즈를 알려줘요.");
+        assertInvalidResponse();
+    }
+
+    @Test
+    void rejectsFourSentencesWithMixedEndingPunctuation() {
+        returnsSummary("분위기가 편안해요. 1주일 안에 사진을 받아요! 2가지 색감이 좋아요? 3가지 포즈를 알려줘요。");
+        assertInvalidResponse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "분위기가 편안해요. 1주일 안에 사진을 받아요. 2가지 색감이 좋아요.",
+            "촬영은 1.5시간 걸렸어요! 2가지 색감이 좋아요? 3가지 포즈를 알려줘요。",
+            "분위기가 편안해요.1주일 안에 사진을 받아요.2가지 색감이 좋아요"
+    })
+    void acceptsUpToThreeSentencesWithDigits(String summary) {
+        returnsSummary(summary);
+        assertThat(service.summarize(List.of("Review")).summaryText()).isEqualTo(summary);
+    }
+
     private void returnsSummary(String summary) {
         returnsOutput(mapper.writeValueAsString(Map.of("status", "ok", "summary_text", summary)), "end_turn");
     }

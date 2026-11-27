@@ -21,6 +21,8 @@ public class ReviewSummaryService {
 
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
     private static final Pattern UNSPACED_KOREAN_PERIOD = Pattern.compile("(?<=\\p{IsHangul})\\.(?=\\p{IsHangul})");
+    private static final Pattern KOREAN_PERIOD_BEFORE_DIGIT =
+            Pattern.compile("(?<=\\p{IsHangul})\\.(?=\\s*\\p{Nd})", Pattern.UNICODE_CHARACTER_CLASS);
 
     private final ClaudeReviewSummaryClient client;
     private final ClaudeReviewSummaryProperties properties;
@@ -117,7 +119,9 @@ public class ReviewSummaryService {
 
     private static int sentenceCount(String summary) {
         BreakIterator sentences = BreakIterator.getSentenceInstance(Locale.KOREAN);
-        sentences.setText(UNSPACED_KOREAN_PERIOD.matcher(summary).replaceAll(". "));
+        String normalized = UNSPACED_KOREAN_PERIOD.matcher(summary).replaceAll(". ");
+        // BreakIterator can skip an ASCII period before a digit. A full stop marks this boundary.
+        sentences.setText(KOREAN_PERIOD_BEFORE_DIGIT.matcher(normalized).replaceAll("\u3002"));
         int count = 0;
         for (int end = sentences.next(); end != BreakIterator.DONE; end = sentences.next()) {
             count++;
