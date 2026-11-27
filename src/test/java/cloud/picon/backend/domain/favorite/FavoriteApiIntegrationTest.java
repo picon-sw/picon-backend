@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -65,7 +66,7 @@ class FavoriteApiIntegrationTest {
     void addsFavoriteWithCommonSuccessResponseAndUpdatesExistingExpertDetail() throws Exception {
         detailFor(VIEWER).andExpect(jsonPath("$.result.isFavorite").value(false));
 
-        assertFavoriteAdded(add(EXPERT, VIEWER));
+        assertFavoriteSuccess(add(EXPERT, VIEWER));
 
         assertThat(favoriteCount()).isEqualTo(1);
         assertThat(jdbc.queryForObject("""
@@ -127,7 +128,7 @@ class FavoriteApiIntegrationTest {
 
     @Test
     void returnsConflictForDuplicateFavorite() throws Exception {
-        assertFavoriteAdded(add(EXPERT, VIEWER));
+        assertFavoriteSuccess(add(EXPERT, VIEWER));
         add(EXPERT, VIEWER).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ALREADY_FAVORITED"));
         assertThat(favoriteCount()).isEqualTo(1);
@@ -149,7 +150,7 @@ class FavoriteApiIntegrationTest {
             int firstStatus = firstResult.andReturn().getResponse().getStatus();
             int secondStatus = secondResult.andReturn().getResponse().getStatus();
             assertThat(new int[]{firstStatus, secondStatus}).containsExactlyInAnyOrder(200, 409);
-            assertFavoriteAdded(firstStatus == 200 ? firstResult : secondResult);
+            assertFavoriteSuccess(firstStatus == 200 ? firstResult : secondResult);
             var conflict = firstStatus == 409 ? firstResult : secondResult;
             conflict.andExpect(jsonPath("$.code").value("ALREADY_FAVORITED"));
         }
@@ -175,11 +176,118 @@ class FavoriteApiIntegrationTest {
                 .andExpect(jsonPath(operation + ".responses['500'].content['application/json']").exists());
     }
 
+    @Test
+    void removesOnlyTheRequestingMembersFavoriteAndUpdatesExpertDetail() throws Exception {
+        assertFavoriteSuccess(add(EXPERT, VIEWER));
+        assertFavoriteSuccess(add(EXPERT, OTHER_VIEWER));
+        jdbc.update("""
+                INSERT INTO expert (member_id, created_at, updated_at)
+                VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, OTHER_VIEWER);
+        assertFavoriteSuccess(add(OTHER_VIEWER, VIEWER));
+        detailFor(VIEWER).andExpect(jsonPath("$.result.isFavorite").value(true));
+
+        assertFavoriteSuccess(remove(EXPERT, VIEWER));
+
+        assertThat(favoriteCount()).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM favorite WHERE member_id = ? AND expert_member_id = ?
+                """, Integer.class, VIEWER, OTHER_VIEWER)).isEqualTo(1);
+        detailFor(VIEWER).andExpect(jsonPath("$.result.isFavorite").value(false));
+        detailFor(OTHER_VIEWER).andExpect(jsonPath("$.result.isFavorite").value(true));
+    }
+
+    @Test
+    void succeedsWhenRemovingTheSameFavoriteTwice() throws Exception {
+        assertFavoriteSuccess(add(EXPERT, VIEWER));
+        assertFavoriteSuccess(remove(EXPERT, VIEWER));
+        assertFavoriteSuccess(remove(EXPERT, VIEWER));
+        assertThat(favoriteCount()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {EXPERT, 999})
+    void succeedsWhenNoFavoriteExistsEvenIfTheExpertIsMissing(long expertId) throws Exception {
+        assertFavoriteSuccess(remove(expertId, VIEWER));
+        assertThat(favoriteCount()).isZero();
+    }
+
+    @Test
+    void removesAnExistingFavoriteAfterTheExpertBecomesHidden() throws Exception {
+        assertFavoriteSuccess(add(EXPERT, VIEWER));
+        jdbc.update("UPDATE member SET nickname = NULL WHERE member_id = ?", EXPERT);
+        mvc.perform(get("/api/experts/{expertId}", EXPERT).header("Authorization", bearer(VIEWER)))
+                .andExpect(status().isNotFound());
+
+        assertFavoriteSuccess(remove(EXPERT, VIEWER));
+
+        assertThat(favoriteCount()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1", "not-a-number", "9223372036854775808"})
+    void rejectsInvalidExpertIdWhenRemoving(String expertId) throws Exception {
+        mvc.perform(delete(PATH, expertId).header("Authorization", bearer(VIEWER)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "Bearer invalid-jwt")
+    void requiresValidJwtWhenRemoving(String authorization) throws Exception {
+        assertFavoriteSuccess(add(EXPERT, VIEWER));
+        var request = delete(PATH, EXPERT);
+        if (authorization != null) {
+            request.header("Authorization", authorization);
+        }
+        mvc.perform(request)
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        assertThat(favoriteCount()).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentRemovalRequestsBothSucceed() throws Exception {
+        assertFavoriteSuccess(add(EXPERT, VIEWER));
+        var start = new CyclicBarrier(2);
+        Callable<ResultActions> request = () -> {
+            start.await(10, TimeUnit.SECONDS);
+            return remove(EXPERT, VIEWER);
+        };
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(request);
+            var second = executor.submit(request);
+            assertFavoriteSuccess(first.get(15, TimeUnit.SECONDS));
+            assertFavoriteSuccess(second.get(15, TimeUnit.SECONDS));
+        }
+        assertThat(favoriteCount()).isZero();
+    }
+
+    @Test
+    void documentsFavoriteRemovalWithoutRequestBodyOrNotFoundResponse() throws Exception {
+        String operation = "$.paths['/api/experts/{expertId}/favorite'].delete";
+        mvc.perform(get("/api/v3/api-docs").with(httpBasic("swagger-test", "swagger-test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(operation + ".security[0].bearerAuth").isArray())
+                .andExpect(jsonPath(operation + ".parameters.length()").value(1))
+                .andExpect(jsonPath(operation + ".requestBody").doesNotExist())
+                .andExpect(jsonPath(operation
+                        + ".responses['200'].content['application/json'].example.code").value("OK"))
+                .andExpect(jsonPath(operation + ".responses['400'].content['application/json']").exists())
+                .andExpect(jsonPath(operation + ".responses['401'].content['application/json']").exists())
+                .andExpect(jsonPath(operation + ".responses['404']").doesNotExist())
+                .andExpect(jsonPath(operation + ".responses['500'].content['application/json']").exists());
+    }
+
+    private ResultActions remove(long expertId, long viewerId) throws Exception {
+        return mvc.perform(delete(PATH, expertId).header("Authorization", bearer(viewerId)));
+    }
+
     private ResultActions add(long expertId, long viewerId) throws Exception {
         return mvc.perform(post(PATH, expertId).header("Authorization", bearer(viewerId)));
     }
 
-    private void assertFavoriteAdded(ResultActions response) throws Exception {
+    private void assertFavoriteSuccess(ResultActions response) throws Exception {
         response.andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSuccess").value(true))
                 .andExpect(jsonPath("$.code").value("OK"))
