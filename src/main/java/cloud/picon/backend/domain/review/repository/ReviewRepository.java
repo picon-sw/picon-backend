@@ -72,13 +72,20 @@ public class ReviewRepository {
     public List<ReviewBody> findBodiesByExpertId(long expertId) {
         return jdbc.query("""
                 SELECT v.review_id, v.review_content
-                FROM review v
-                JOIN reservation r ON r.reservation_id = v.reservation_id
-                JOIN proposal p ON p.proposal_id = r.proposal_id
-                JOIN expert e ON e.member_id = p.member_id
-                WHERE e.member_id = :expertId
+                """ + EXPERT_REVIEWS + """
+                  AND EXISTS (SELECT 1 FROM expert e WHERE e.member_id = p.member_id)
                 ORDER BY v.review_id
                 """, Map.of("expertId", expertId),
+                (rs, rowNum) -> new ReviewBody(rs.getLong("review_id"), rs.getString("review_content")));
+    }
+
+    public List<ReviewBody> findNewestBodiesByExpertId(long expertId, int size, long offset) {
+        return jdbc.query("""
+                SELECT v.review_id, v.review_content
+                """ + EXPERT_REVIEWS + """
+                ORDER BY v.created_at DESC, v.review_id DESC
+                LIMIT :size OFFSET :offset
+                """, Map.of("expertId", expertId, "size", size, "offset", offset),
                 (rs, rowNum) -> new ReviewBody(rs.getLong("review_id"), rs.getString("review_content")));
     }
 

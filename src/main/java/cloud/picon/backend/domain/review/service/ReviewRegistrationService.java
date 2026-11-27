@@ -7,6 +7,7 @@ import cloud.picon.backend.domain.review.repository.ReviewRepository;
 import cloud.picon.backend.global.apipayload.code.ErrorCode;
 import cloud.picon.backend.global.apipayload.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -24,6 +25,7 @@ public class ReviewRegistrationService {
     private static final int MAX_TAGS_JSON_BYTES = 16 * 1024;
 
     private final ReviewRepository repository;
+    private final ApplicationEventPublisher events;
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReviewResponse register(long reservationId, long memberId, ReviewCreateRequest request) {
@@ -81,6 +83,7 @@ public class ReviewRegistrationService {
             throw e;
         }
         repository.refreshExpertRating(context.expertId());
+        events.publishEvent(new ReviewRegistered(context.expertId()));
         return new ReviewResponse(reviewId, rating, tags, content, now.atOffset(ZoneOffset.UTC));
     }
 }
