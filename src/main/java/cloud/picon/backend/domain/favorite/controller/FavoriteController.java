@@ -1,6 +1,7 @@
 package cloud.picon.backend.domain.favorite.controller;
 
 import cloud.picon.backend.domain.favorite.service.FavoriteService;
+import cloud.picon.backend.global.apipayload.ApiResponse;
 import cloud.picon.backend.global.jwt.LoginMemberId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,8 +19,8 @@ public class FavoriteController implements FavoriteControllerDocs {
 
     @Override
     @PostMapping("/{expertId}/favorite")
-    public ResponseEntity<Void> add(@PathVariable long expertId, @LoginMemberId Long memberId) {
+    public ResponseEntity<ApiResponse<Void>> add(@PathVariable long expertId, @LoginMemberId Long memberId) {
         favoriteService.add(expertId, memberId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.onSuccess(null));
     }
 }

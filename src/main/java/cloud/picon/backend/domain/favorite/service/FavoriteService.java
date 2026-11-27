@@ -1,6 +1,7 @@
 package cloud.picon.backend.domain.favorite.service;
 
 import cloud.picon.backend.domain.expert.code.ExpertErrorCode;
+import cloud.picon.backend.domain.expert.repository.ExpertDetailRepository;
 import cloud.picon.backend.domain.expert.repository.ExpertRepository;
 import cloud.picon.backend.domain.favorite.code.FavoriteErrorCode;
 import cloud.picon.backend.domain.favorite.entity.Favorite;
@@ -25,6 +26,7 @@ public class FavoriteService {
 
     private final FavoriteRepository favorites;
     private final ExpertRepository experts;
+    private final ExpertDetailRepository expertDetails;
     private final MemberRepository members;
 
     @Transactional
@@ -33,6 +35,9 @@ public class FavoriteService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
 
+        if (!expertDetails.existsVisibleExpert(expertId)) {
+            throw new BusinessException(ExpertErrorCode.EXPERT_NOT_FOUND);
+        }
         var expert = experts.findById(expertId)
                 .orElseThrow(() -> new BusinessException(ExpertErrorCode.EXPERT_NOT_FOUND));
         var member = members.findById(memberId)

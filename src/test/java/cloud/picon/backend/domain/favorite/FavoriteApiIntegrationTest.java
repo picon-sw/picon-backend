@@ -4,6 +4,7 @@ import cloud.picon.backend.global.jwt.JwtProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -61,10 +62,10 @@ class FavoriteApiIntegrationTest {
     }
 
     @Test
-    void addsFavoriteWithoutResponseBodyAndUpdatesExistingExpertDetail() throws Exception {
+    void addsFavoriteWithCommonSuccessResponseAndUpdatesExistingExpertDetail() throws Exception {
         detailFor(VIEWER).andExpect(jsonPath("$.result.isFavorite").value(false));
 
-        add(EXPERT, VIEWER).andExpect(status().isNoContent()).andExpect(content().string(""));
+        assertFavoriteAdded(add(EXPERT, VIEWER));
 
         assertThat(favoriteCount()).isEqualTo(1);
         assertThat(jdbc.queryForObject("""
@@ -105,11 +106,16 @@ class FavoriteApiIntegrationTest {
         assertThat(favoriteCount()).isZero();
     }
 
-    @Test
-    void acceptsAnExistingExpertWithoutApplyingDetailVisibilityRules() throws Exception {
-        jdbc.update("UPDATE member SET nickname = NULL WHERE member_id = ?", EXPERT);
-        add(EXPERT, VIEWER).andExpect(status().isNoContent());
-        assertThat(favoriteCount()).isEqualTo(1);
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "\u00a0\u2009"})
+    void rejectsExpertsWithoutVisibleNicknames(String nickname) throws Exception {
+        jdbc.update("UPDATE member SET nickname = ? WHERE member_id = ?", nickname, EXPERT);
+        mvc.perform(get("/api/experts/{expertId}", EXPERT).header("Authorization", bearer(VIEWER)))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("EXPERT_NOT_FOUND"));
+        add(EXPERT, VIEWER).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("EXPERT_NOT_FOUND"));
+        assertThat(favoriteCount()).isZero();
     }
 
     @Test
@@ -121,7 +127,7 @@ class FavoriteApiIntegrationTest {
 
     @Test
     void returnsConflictForDuplicateFavorite() throws Exception {
-        add(EXPERT, VIEWER).andExpect(status().isNoContent());
+        assertFavoriteAdded(add(EXPERT, VIEWER));
         add(EXPERT, VIEWER).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ALREADY_FAVORITED"));
         assertThat(favoriteCount()).isEqualTo(1);
@@ -142,7 +148,8 @@ class FavoriteApiIntegrationTest {
             var secondResult = second.get(15, TimeUnit.SECONDS);
             int firstStatus = firstResult.andReturn().getResponse().getStatus();
             int secondStatus = secondResult.andReturn().getResponse().getStatus();
-            assertThat(new int[]{firstStatus, secondStatus}).containsExactlyInAnyOrder(204, 409);
+            assertThat(new int[]{firstStatus, secondStatus}).containsExactlyInAnyOrder(200, 409);
+            assertFavoriteAdded(firstStatus == 200 ? firstResult : secondResult);
             var conflict = firstStatus == 409 ? firstResult : secondResult;
             conflict.andExpect(jsonPath("$.code").value("ALREADY_FAVORITED"));
         }
@@ -157,7 +164,10 @@ class FavoriteApiIntegrationTest {
                 .andExpect(jsonPath(operation + ".security[0].bearerAuth").isArray())
                 .andExpect(jsonPath(operation + ".parameters.length()").value(1))
                 .andExpect(jsonPath(operation + ".requestBody").doesNotExist())
-                .andExpect(jsonPath(operation + ".responses['204'].content").doesNotExist())
+                .andExpect(jsonPath(operation + ".responses['200'].content['application/json']").exists())
+                .andExpect(jsonPath(operation
+                        + ".responses['200'].content['application/json'].example.code").value("OK"))
+                .andExpect(jsonPath(operation + ".responses['204']").doesNotExist())
                 .andExpect(jsonPath(operation + ".responses['400'].content['application/json']").exists())
                 .andExpect(jsonPath(operation + ".responses['401'].content['application/json']").exists())
                 .andExpect(jsonPath(operation + ".responses['404'].content['application/json']").exists())
@@ -167,6 +177,14 @@ class FavoriteApiIntegrationTest {
 
     private ResultActions add(long expertId, long viewerId) throws Exception {
         return mvc.perform(post(PATH, expertId).header("Authorization", bearer(viewerId)));
+    }
+
+    private void assertFavoriteAdded(ResultActions response) throws Exception {
+        response.andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.message").value("요청에 성공했습니다."))
+                .andExpect(jsonPath("$.result").doesNotHaveJsonPath());
     }
 
     private ResultActions detailFor(long viewerId) throws Exception {

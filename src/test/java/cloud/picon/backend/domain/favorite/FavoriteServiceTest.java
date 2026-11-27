@@ -1,6 +1,7 @@
 package cloud.picon.backend.domain.favorite;
 
 import cloud.picon.backend.domain.expert.entity.Expert;
+import cloud.picon.backend.domain.expert.repository.ExpertDetailRepository;
 import cloud.picon.backend.domain.expert.repository.ExpertRepository;
 import cloud.picon.backend.domain.favorite.repository.FavoriteRepository;
 import cloud.picon.backend.domain.favorite.service.FavoriteService;
@@ -31,8 +32,10 @@ class FavoriteServiceTest {
     void preservesUnrelatedDatabaseErrors(int vendorCode, String constraint) {
         var favorites = mock(FavoriteRepository.class);
         var experts = mock(ExpertRepository.class);
+        var expertDetails = mock(ExpertDetailRepository.class);
         var members = mock(MemberRepository.class);
-        var service = new FavoriteService(favorites, experts, members);
+        var service = new FavoriteService(favorites, experts, expertDetails, members);
+        when(expertDetails.existsVisibleExpert(10L)).thenReturn(true);
         when(experts.findById(10L)).thenReturn(Optional.of(mock(Expert.class)));
         when(members.findById(20L)).thenReturn(Optional.of(mock(Member.class)));
 

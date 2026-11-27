@@ -14,7 +14,10 @@ public interface FavoriteControllerDocs {
     @Operation(summary = "전문가 찜 추가", security = @SecurityRequirement(name = "bearerAuth"),
             description = "로그인한 회원의 찜에 전문가를 추가합니다. 본인은 찜할 수 없습니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "찜 추가 성공", content = @Content),
+            @ApiResponse(responseCode = "200", description = "찜 추가 성공",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+                            {"isSuccess":true,"code":"OK","message":"요청에 성공했습니다."}
+                            """))),
             @ApiResponse(responseCode = "400", description = "잘못된 전문가 ID 또는 본인 찜",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
                             {"isSuccess":false,"code":"INVALID_REQUEST","message":"요청 값이 올바르지 않습니다."}
@@ -23,7 +26,7 @@ public interface FavoriteControllerDocs {
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
                             {"isSuccess":false,"code":"UNAUTHORIZED","message":"로그인이 필요합니다."}
                             """))),
-            @ApiResponse(responseCode = "404", description = "전문가 없음",
+            @ApiResponse(responseCode = "404", description = "전문가가 없거나 노출 대상 아님",
                     content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
                             {"isSuccess":false,"code":"EXPERT_NOT_FOUND","message":"전문가 정보를 찾을 수 없습니다."}
                             """))),
@@ -36,6 +39,7 @@ public interface FavoriteControllerDocs {
                             {"isSuccess":false,"code":"INTERNAL_ERROR","message":"서버 오류가 발생했습니다."}
                             """)))
     })
-    ResponseEntity<Void> add(@Parameter(description = "전문가 회원 ID") long expertId,
-                             @Parameter(hidden = true) Long memberId);
+    ResponseEntity<cloud.picon.backend.global.apipayload.ApiResponse<Void>> add(
+            @Parameter(description = "전문가 회원 ID") long expertId,
+            @Parameter(hidden = true) Long memberId);
 }
