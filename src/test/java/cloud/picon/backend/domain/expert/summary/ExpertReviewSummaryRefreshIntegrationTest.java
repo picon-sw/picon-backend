@@ -99,6 +99,7 @@ public class ExpertReviewSummaryRefreshIntegrationTest {
         seedReview(5, 1, "");
         seedReview(6, 1, " \u0085 ");
         seedReview(7, 1, "Contact me at someone@example.invalid");
+        seedReview(8, 1, "촬영 후기와 함께 남긴 연락처는 ０１０\u00a0１２３４–５６７８입니다.");
         var expected = List.of("On time", "Friendly service", "Great photos");
         when(claude.summarize(expected)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
