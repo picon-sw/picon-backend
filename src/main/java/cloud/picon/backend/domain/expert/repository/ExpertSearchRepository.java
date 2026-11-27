@@ -14,11 +14,6 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ExpertSearchRepository {
 
-    // Unicode White_Space를 명시해 MySQL ICU와 H2 Java 정규식의 공백 판정을 일치시킨다.
-    // ASCII U+0009~U+000D는 탭·개행·수직 탭·폼 피드·캐리지 리턴이다.
-    static final String NON_WHITESPACE_PATTERN =
-            "[^\t-\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]";
-
     private final NamedParameterJdbcTemplate jdbc;
 
     public record ExpertRow(Long id, String nickname, String profileImage, String introduction,
@@ -31,9 +26,10 @@ public class ExpertSearchRepository {
     private Filter filter(ExpertSearchCondition condition) {
         StringBuilder sql = new StringBuilder("""
                 FROM expert e JOIN member m ON m.member_id = e.member_id
-                WHERE m.nickname IS NOT NULL AND REGEXP_LIKE(m.nickname, :nonWhitespacePattern)
-                """);
-        MapSqlParameterSource parameters = new MapSqlParameterSource("nonWhitespacePattern", NON_WHITESPACE_PATTERN);
+                WHERE
+                """).append(ExpertVisibility.NICKNAME_CONDITION).append('\n');
+        MapSqlParameterSource parameters = new MapSqlParameterSource(
+                "nonWhitespacePattern", ExpertVisibility.NON_WHITESPACE_PATTERN);
         if (!condition.keyword().isEmpty()) {
             // escape 문자 자체도 먼저 처리해 %, _를 일반 문자로 검색한다.
             String escaped = condition.keyword().replace("!", "!!").replace("%", "!%").replace("_", "!_");
