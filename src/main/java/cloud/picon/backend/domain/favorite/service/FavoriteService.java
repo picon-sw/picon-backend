@@ -52,6 +52,14 @@ public class FavoriteService {
         }
     }
 
+    @Transactional
+    public void remove(long expertId, long memberId) {
+        if (expertId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        favorites.deleteByMemberAndExpertIds(memberId, expertId);
+    }
+
     private static boolean isDuplicateFavorite(DataIntegrityViolationException exception) {
         for (Throwable cause = exception.getCause(); cause != null; cause = cause.getCause()) {
             if (cause instanceof ConstraintViolationException violation && violation.getConstraintName() != null) {

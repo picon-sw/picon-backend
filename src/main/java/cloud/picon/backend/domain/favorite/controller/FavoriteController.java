@@ -5,6 +5,7 @@ import cloud.picon.backend.global.apipayload.ApiResponse;
 import cloud.picon.backend.global.jwt.LoginMemberId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,6 +22,13 @@ public class FavoriteController implements FavoriteControllerDocs {
     @PostMapping("/{expertId}/favorite")
     public ResponseEntity<ApiResponse<Void>> add(@PathVariable long expertId, @LoginMemberId Long memberId) {
         favoriteService.add(expertId, memberId);
+        return ResponseEntity.ok(ApiResponse.onSuccess(null));
+    }
+
+    @Override
+    @DeleteMapping("/{expertId}/favorite")
+    public ResponseEntity<ApiResponse<Void>> remove(@PathVariable long expertId, @LoginMemberId Long memberId) {
+        favoriteService.remove(expertId, memberId);
         return ResponseEntity.ok(ApiResponse.onSuccess(null));
     }
 }
