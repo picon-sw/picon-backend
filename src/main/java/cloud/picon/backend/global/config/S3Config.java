@@ -2,8 +2,11 @@ package cloud.picon.backend.global.config;
 
 import cloud.picon.backend.global.s3.S3Properties;
 import cloud.picon.backend.global.s3.LocalFakeImageUrlProvider;
+import cloud.picon.backend.global.s3.LocalFakeUploadUrlProvider;
 import cloud.picon.backend.global.s3.S3ImageUrlProvider;
 import cloud.picon.backend.global.s3.PresignedS3ImageUrlProvider;
+import cloud.picon.backend.global.s3.PresignedS3UploadUrlProvider;
+import cloud.picon.backend.global.s3.S3UploadUrlProvider;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -30,10 +33,21 @@ public class S3Config {
     @Bean
     @ConditionalOnProperty(prefix = "app.s3", name = "fake-image-url", havingValue = "true")
     public S3ImageUrlProvider localFakeImageUrlProvider(Environment environment) {
-        if (!Arrays.equals(environment.getActiveProfiles(), new String[]{"local"})) {
-            throw new IllegalStateException("Fake image URLs require the local profile alone");
-        }
+        requireLocalProfileAlone(environment);
         return new LocalFakeImageUrlProvider();
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.s3", name = "fake-image-url", havingValue = "false", matchIfMissing = true)
+    public S3UploadUrlProvider realUploadUrlProvider(ObjectProvider<S3Presigner> presigner, S3Properties properties) {
+        return new PresignedS3UploadUrlProvider(presigner, properties);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.s3", name = "fake-image-url", havingValue = "true")
+    public S3UploadUrlProvider localFakeUploadUrlProvider(Environment environment) {
+        requireLocalProfileAlone(environment);
+        return new LocalFakeUploadUrlProvider();
     }
 
     @Bean(destroyMethod = "close")
@@ -45,5 +59,11 @@ public class S3Config {
             builder.region(Region.of(properties.region()));
         }
         return builder.build();
+    }
+
+    private static void requireLocalProfileAlone(Environment environment) {
+        if (!Arrays.equals(environment.getActiveProfiles(), new String[]{"local"})) {
+            throw new IllegalStateException("Fake image URLs require the local profile alone");
+        }
     }
 }
